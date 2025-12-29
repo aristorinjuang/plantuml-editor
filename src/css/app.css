@@ -50,7 +50,7 @@ main {
 }
 #logo-title{
   padding-left: 40px;
-  background-image: url("/images/logo.png") !important;
+  background-image: url("/images/logo.svg") !important;
   background-repeat: no-repeat !important;
   background-position: left center !important;
   background-size: 30px 30px !important;
