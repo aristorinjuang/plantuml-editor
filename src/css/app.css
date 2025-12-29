@@ -1,4 +1,40 @@
 @import "tailwindcss";
+
+/* ============================================================================
+   THEME CSS VARIABLES
+   ============================================================================ */
+
+:root {
+  --preview-bg: #ffffff;
+  --preview-text: #1f2937;
+  --preview-border: #e5e7eb;
+}
+
+[data-theme="dark"] {
+  --preview-bg: #141414;
+  --preview-text: #f1f5f9;
+  --preview-border: #333333;
+}
+
+/* Apply theme to preview panel's parent container */
+#main-container {
+  background-color: var(--preview-bg);
+  transition: background-color 0.3s ease;
+}
+
+main {
+  color: var(--preview-text);
+}
+
+#right-panel-image-wrapper {
+  color: var(--preview-text);
+}
+
+/* Invert PlantUML diagram colors in dark mode for better integration */
+[data-theme="dark"] #render-image {
+  filter: invert(0.92) hue-rotate(180deg);
+  transition: filter 0.3s ease;
+}
 .ts-control {
   background-color: #1a2234 !important;
   color: #f8fafc !important;
@@ -41,6 +77,35 @@
 #file-modal:not(.hidden) {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* ============================================================================
+   RESPONSIVE HEADER LAYOUT
+   ============================================================================ */
+
+.header-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-direction: row;
+}
+
+@media (max-width: 810px) {
+  .header-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .header-container #logo-title {
+    text-align: center;
+    padding-left: 40px;
+    background-position: calc(50% - 68px) center !important;
+  }
+
+  .header-container .flex.gap-2 {
+    justify-content: center;
+  }
 }
 
 /* ============================================================================
@@ -105,7 +170,8 @@
   /* Enhanced touch targets (Task 4) */
   /* Toolbar buttons - 44px minimum for iOS HIG */
   #btn-save,
-  #btn-open {
+  #btn-open,
+  #btn-theme {
     min-height: 44px;
     padding: 0.75rem 1rem;
     font-size: 1rem;

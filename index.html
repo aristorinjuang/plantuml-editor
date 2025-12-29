@@ -25,20 +25,27 @@
         </button>
       </div>
 
-      <div class="h-full w-screen flex flex-row">
+      <div id="main-container" class="h-full w-screen flex flex-row">
           <aside style="z-index: 999;" class="w-3/5" id="sidePanel">
             <div id="sidebar" class="bg-gray-900 h-screen md:block shadow-xl px-0 w-full overflow-x-hidden transition-transform duration-300 ease-in-out">
               <div class="space-y-2 md:space-y-2 mt-2">
-                <div class="flex items-center justify-between px-4 py-2">
+                <div class="header-container px-4 py-2">
                   <h1 class="font-bold text-sm md:text-xl text-white" id="logo-title">
                     <span>PlantUML Editor</span>
                   </h1>
-                  <div class="flex gap-2">
+                  <div class="flex gap-2 justify-end">
                     <button id="btn-save" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors cursor-pointer" title="Save As (Ctrl+S)">
                       Save
                     </button>
                     <button id="btn-open" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors cursor-pointer" title="Open (Ctrl+O)">
                       Open
+                    </button>
+                    <button id="btn-theme" class="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded transition-colors cursor-pointer flex items-center gap-1" title="Toggle theme" aria-label="Toggle preview theme">
+                      <span id="theme-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                      </span>
                     </button>
                   </div>
                 </div>
