@@ -13,8 +13,32 @@
   width: 11px;
 }
 #logo-title{
+  padding-left: 40px;
   background-image: url("/images/logo.png") !important;
   background-repeat: no-repeat !important;
-  background-position: left 24% top 50% !important;
+  background-position: left center !important;
   background-size: 30px 30px !important;
+}
+
+/* File Panel Modal Styles */
+#file-list > div {
+  transition: background-color 0.15s ease-in-out;
+}
+
+#file-list > div:hover {
+  background-color: #f9fafb;
+}
+
+#file-modal {
+  transition: opacity 0.2s ease-in-out;
+}
+
+#file-modal.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#file-modal:not(.hidden) {
+  opacity: 1;
+  pointer-events: auto;
 }
