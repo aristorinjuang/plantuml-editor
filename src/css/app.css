@@ -42,3 +42,115 @@
   opacity: 1;
   pointer-events: auto;
 }
+
+/* ============================================================================
+   RESPONSIVE LAYOUT - MOBILE (≤ 810px)
+   ============================================================================ */
+
+/* Hide tabs by default (desktop first) */
+#tab-navigation {
+  display: none;
+}
+
+@media (max-width: 810px) {
+  /* Hide Ace Editor's mobile menu */
+  .ace_mobile-menu {
+    display: none !important;
+  }
+
+  /* Make container full-width on mobile */
+  .container {
+    max-width: none !important;
+    width: 100% !important;
+    padding: 0 !important;
+  }
+
+  /* Show tab navigation on mobile */
+  #tab-navigation {
+    display: flex !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* Make panels full-width on mobile - but only if visible */
+  #sidePanel {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
+  #sidePanel.hidden {
+    display: none !important;
+  }
+
+  main {
+    width: 100% !important;
+    padding: 1rem;
+    flex: 1 1 100% !important;
+  }
+
+  main.hidden {
+    display: none !important;
+  }
+
+  /* Adjust editor height to account for tab navigation (48px) */
+  #editor {
+    height: calc(100vh - 48px);
+  }
+
+  /* Hide resizer on mobile */
+  #resizer {
+    display: none !important;
+  }
+
+  /* Enhanced touch targets (Task 4) */
+  /* Toolbar buttons - 44px minimum for iOS HIG */
+  #btn-save,
+  #btn-open {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+  }
+
+  /* Tab buttons - 48px for better touch targets */
+  #tab-code,
+  #tab-preview {
+    min-height: 48px;
+    font-size: 1.125rem;
+  }
+
+  /* Toolbar layout optimization (Task 5) */
+  #logo-title {
+    font-size: 1rem;
+    padding-left: 2.5rem;
+  }
+
+  /* Reduce gap between logo and buttons */
+  .flex.items-center.justify-between {
+    gap: 0.5rem;
+  }
+}
+
+/* ============================================================================
+   RESPONSIVE LAYOUT - DESKTOP (> 810px)
+   ============================================================================ */
+
+@media (min-width: 811px) {
+  /* Tab navigation already hidden by default rule above */
+
+  /* Ensure both panels visible on desktop */
+  #sidePanel,
+  main {
+    display: block !important;
+    flex: unset !important;
+  }
+
+  #sidePanel.hidden,
+  main.hidden {
+    display: block !important;
+  }
+
+  /* Ensure resizer visible on desktop */
+  #resizer {
+    display: block !important;
+  }
+}

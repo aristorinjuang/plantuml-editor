@@ -78,6 +78,9 @@ plantuml.initialize(jarPath).then(() => {
   // Initial render
   debouncedRender()
 
+  // Initialize tab state for mobile
+  initializeTabs()
+
   // Attach change listeners
   editor.session.on('change', function() {
     debouncedRender()   // Update preview
@@ -85,19 +88,100 @@ plantuml.initialize(jarPath).then(() => {
   })
 })
 
+// Tab element references (must be defined before event listeners)
+const sidePanel = document.querySelector('#sidePanel')
+const mainPanel = document.querySelector('main')
+const tabCode = document.getElementById('tab-code')
+const tabPreview = document.getElementById('tab-preview')
+
+// Tab state (must be defined before initializeTabs uses it)
+let activeTab = 'code' // 'code' or 'preview'
+
+// Tab switching event listeners
+tabCode.addEventListener('click', () => switchTab('code'))
+tabPreview.addEventListener('click', () => switchTab('preview'))
+
+// Initialize tab state on page load
+function initializeTabs() {
+  // Check screen size
+  if (window.innerWidth <= 810) {
+    // Mobile: start with code tab active, hide preview
+    switchTab('code')
+  } else {
+    // Desktop: ensure both panels visible, reset any hidden states
+    sidePanel.classList.remove('hidden')
+    mainPanel.classList.remove('hidden')
+  }
+}
+
+// Handle screen resize/orientation changes
+window.addEventListener('resize', () => {
+  const isMobile = window.innerWidth <= 810
+
+  if (isMobile && activeTab === 'code') {
+    // Already on code tab, ensure preview is hidden
+    mainPanel.classList.add('hidden')
+  } else if (isMobile && activeTab === 'preview') {
+    // Already on preview tab, ensure code is hidden
+    sidePanel.classList.add('hidden')
+  } else if (!isMobile) {
+    // Switched to desktop: ensure both panels visible
+    sidePanel.classList.remove('hidden')
+    mainPanel.classList.remove('hidden')
+  }
+})
+
 const element = document.querySelector('#right-panel-image-wrapper')
 
 panzoom(element)
 
+// ============================================================================
+// RESPONSIVE TAB NAVIGATION
+// ============================================================================
+
+function switchTab(tab) {
+  activeTab = tab
+
+  if (tab === 'code') {
+    // Show code panel, hide preview
+    sidePanel.classList.remove('hidden')
+    mainPanel.classList.add('hidden')
+
+    // Update tab styles
+    tabCode.classList.add('border-blue-500', 'text-white')
+    tabCode.classList.remove('border-transparent', 'text-gray-400')
+    tabPreview.classList.remove('border-blue-500', 'text-white')
+    tabPreview.classList.add('border-transparent', 'text-gray-400')
+
+    // Focus editor
+    editor.focus()
+  } else {
+    // Show preview, hide code panel
+    sidePanel.classList.add('hidden')
+    mainPanel.classList.remove('hidden')
+
+    // Update tab styles
+    tabPreview.classList.add('border-blue-500', 'text-white')
+    tabPreview.classList.remove('border-transparent', 'text-gray-400')
+    tabCode.classList.remove('border-blue-500', 'text-white')
+    tabCode.classList.add('border-transparent', 'text-gray-400')
+
+    // Auto-render when switching to preview
+    _render()
+  }
+}
+
 const resizer = document.querySelector('#resizer')
 const sidebar = document.querySelector('#sidebar')
-const sidePanel = document.querySelector('#sidePanel')
 
 resizer.addEventListener('mousedown', () => {
-  document.addEventListener('mousemove', resize, false)
-  document.addEventListener('mouseup', () => {
-    document.removeEventListener('mousemove', resize, false)
-  }, false)
+  // Only enable on desktop
+  if (window.innerWidth > 810) {
+    document.addEventListener('mousemove', resize, false)
+    document.addEventListener('mouseup', () => {
+      document.removeEventListener('mousemove', resize, false)
+    }, false)
+  }
 })
 
 function resize(e) {

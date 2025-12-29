@@ -15,8 +15,17 @@
   </head>
   <body class="bg-white font-poppins antialiased">
     <div class="container">
-      <div class="flex">
-        <div class="h-full w-screen flex flex-row">
+      <!-- Tab Navigation (mobile only, hidden on desktop) -->
+      <div id="tab-navigation" class="bg-gray-800 flex w-full">
+        <button id="tab-code" class="flex-1 py-3 text-white font-medium border-b-2 border-blue-500">
+          Code
+        </button>
+        <button id="tab-preview" class="flex-1 py-3 text-gray-400 font-medium border-b-2 border-transparent">
+          Preview
+        </button>
+      </div>
+
+      <div class="h-full w-screen flex flex-row">
           <aside style="z-index: 999;" class="w-3/5" id="sidePanel">
             <div id="sidebar" class="bg-gray-900 h-screen md:block shadow-xl px-0 w-full overflow-x-hidden transition-transform duration-300 ease-in-out">
               <div class="space-y-2 md:space-y-2 mt-2">
