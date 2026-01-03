@@ -79,6 +79,26 @@ main {
   pointer-events: auto;
 }
 
+/* Share Modal Styles */
+#share-modal {
+  transition: opacity 0.2s ease-in-out;
+}
+
+#share-modal.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#share-modal:not(.hidden) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#share-url {
+  font-family: monospace;
+  font-size: 0.875rem;
+}
+
 /* ============================================================================
    RESPONSIVE HEADER LAYOUT
    ============================================================================ */
@@ -171,6 +191,7 @@ main {
   /* Toolbar buttons - 44px minimum for iOS HIG */
   #btn-save,
   #btn-open,
+  #btn-share,
   #btn-theme {
     min-height: 44px;
     padding: 0.75rem 1rem;

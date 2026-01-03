@@ -1,12 +1,5 @@
 // load parameters
 const pathname = window.location.pathname.match(/^.*[\/]/)[0] // until the trailing slash, do not include the filename
-const hashParams = window.location.hash.substring(1).split('&').reduce(function (res, item) {
-  var parts = item.split('=')
-
-  res[parts[0]] = parts[1]
-
-  return res
-}, {})
 
 // set up editor
 ace.config.set("loadWorkerFromBlob", false)
@@ -15,8 +8,23 @@ const editor = ace.edit("editor")
 
 editor.setTheme("ace/theme/monokai")
 editor.session.setMode("ace/mode/javascript")
-if(hashParams['encodedString']){
-  editor.setValue(plantumlEncoder.decode(hashParams['encodedString']), -1)
+
+// Track if we loaded content from URL (to prevent overwriting with default)
+let loadedFromUrl = false
+
+// Load shared diagram from URL fragment (new format: #/${encoded})
+const hash = window.location.hash
+if (hash && hash.startsWith('#/')) {
+  const encoded = hash.substring(2) // Remove '#/'
+  try {
+    const decoded = decodePlantuml(encoded)
+    if (decoded) {
+      editor.setValue(decoded, -1)
+      loadedFromUrl = true
+    }
+  } catch (error) {
+    console.error('Failed to decode shared diagram:', error)
+  }
 }
 editor.focus()
 
@@ -103,6 +111,179 @@ const debouncedLoadFromUrl = debounce((url) => loadFromUrl(url))
 const jarPath = "/app" + pathname + "jar"
 
 // ============================================================================
+// SHARE FUNCTIONALITY
+// ============================================================================
+
+/**
+ * Encode PlantUML content using URL-safe base64 encoding
+ * @param {string} text - PlantUML text to encode
+ * @returns {string} URL-safe base64 encoded string
+ */
+function encodePlantuml(text) {
+  // Use browser's built-in btoa with UTF-8 handling
+  const utf8Bytes = encodeURIComponent(text).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+    return String.fromCharCode('0x' + p1)
+  })
+  const base64 = btoa(utf8Bytes)
+  // Make it URL-safe
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/**
+ * Decode PlantUML content from URL-safe base64 encoding
+ * @param {string} encoded - URL-safe base64 encoded string
+ * @returns {string} Decoded PlantUML text
+ */
+function decodePlantuml(encoded) {
+  // Restore base64 format
+  let base64 = encoded.replace(/-/g, '+').replace(/_/g, '/')
+  // Add padding if needed
+  while (base64.length % 4) {
+    base64 += '='
+  }
+  // Decode
+  const utf8Bytes = atob(base64)
+  return decodeURIComponent(utf8Bytes.split('').map(c => {
+    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+  }).join(''))
+}
+
+/**
+ * Generate shareable URL with encoded PlantUML content
+ * @returns {string} Full shareable URL
+ */
+function generateShareUrl() {
+  // Check if editor exists
+  if (!editor || typeof editor.getValue !== 'function') {
+    console.error('Editor not initialized')
+    return null
+  }
+
+  const plantumlContent = editor.getValue()
+  const encoded = encodePlantuml(plantumlContent)
+  const baseUrl = window.location.origin + window.location.pathname
+  const fullUrl = `${baseUrl}#/${encoded}`
+
+  // Warn if URL is getting too long (browsers typically support ~2000-8000 chars)
+  const MAX_SAFE_URL_LENGTH = 6000
+  if (fullUrl.length > MAX_SAFE_URL_LENGTH) {
+    console.warn(`Generated URL is ${fullUrl.length} characters. Some browsers may have issues with URLs over ${MAX_SAFE_URL_LENGTH} characters.`)
+  }
+
+  return fullUrl
+}
+
+/**
+ * Copy text to clipboard using modern Clipboard API with fallback
+ * @param {string} text - Text to copy
+ * @returns {Promise<boolean>} True if successful, false otherwise
+ */
+async function copyToClipboard(text) {
+  // Try modern Clipboard API first
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch (error) {
+      console.error('Clipboard API failed, trying fallback:', error)
+    }
+  }
+
+  // Fallback: Use document.execCommand('copy')
+  try {
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-9999px'
+    textArea.style.top = '-9999px'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+
+    const successful = document.execCommand('copy')
+    document.body.removeChild(textArea)
+
+    return successful
+  } catch (error) {
+    console.error('Fallback clipboard copy also failed:', error)
+    return false
+  }
+}
+
+// Track auto-dismiss timer to prevent race conditions
+let shareModalTimer = null
+
+/**
+ * Show share notification modal with URL
+ * @param {string} url - Shareable URL
+ * @param {boolean} copySuccess - Whether clipboard copy succeeded
+ */
+function showShareNotification(url, copySuccess = true) {
+  const shareModal = document.getElementById('share-modal')
+  const shareUrlInput = document.getElementById('share-url')
+  const successMessage = document.getElementById('share-success-message')
+  const errorMessage = document.getElementById('share-error-message')
+
+  // Clear any existing timer to prevent race conditions
+  if (shareModalTimer !== null) {
+    clearTimeout(shareModalTimer)
+    shareModalTimer = null
+  }
+
+  // Set URL in input
+  shareUrlInput.value = url
+
+  // Show appropriate message
+  if (copySuccess) {
+    successMessage.classList.remove('hidden')
+    errorMessage.classList.add('hidden')
+  } else {
+    successMessage.classList.add('hidden')
+    errorMessage.classList.remove('hidden')
+    // Auto-select text for manual copy if clipboard failed
+    shareUrlInput.select()
+  }
+
+  // Show modal
+  shareModal.classList.remove('hidden')
+
+  // Auto-dismiss after 3 seconds
+  shareModalTimer = setTimeout(() => {
+    closeShareModal()
+    shareModalTimer = null
+  }, 3000)
+}
+
+/**
+ * Close share modal
+ */
+function closeShareModal() {
+  const shareModal = document.getElementById('share-modal')
+  shareModal.classList.add('hidden')
+  // Clear timer if modal is manually closed
+  if (shareModalTimer !== null) {
+    clearTimeout(shareModalTimer)
+    shareModalTimer = null
+  }
+}
+
+/**
+ * Handle share button click - orchestrate share flow
+ */
+async function handleShare() {
+  const url = generateShareUrl()
+
+  // Check if URL generation failed
+  if (!url) {
+    alert('Unable to generate share link. Please try again.')
+    return
+  }
+
+  const copySuccess = await copyToClipboard(url)
+  showShareNotification(url, copySuccess)
+}
+
+// ============================================================================
 // AUTO-SAVE FUNCTIONALITY
 // ============================================================================
 
@@ -120,8 +301,10 @@ function initializeDefaultFile() {
 }
 
 plantuml.initialize(jarPath).then(() => {
-  // Initialize default file content
-  initializeDefaultFile()
+  // Initialize default file content (only if not loaded from URL)
+  if (!loadedFromUrl) {
+    initializeDefaultFile()
+  }
 
   // Initial render
   debouncedRender()
@@ -644,6 +827,22 @@ document.getElementById('btn-theme').addEventListener('click', () => {
   const newTheme = currentTheme === 'dark' ? 'light' : 'dark'
   setTheme(newTheme)
 })
+
+// Share button event listener
+document.getElementById('btn-share').addEventListener('click', handleShare)
+
+// Share modal close buttons
+document.getElementById('close-share-modal').addEventListener('click', closeShareModal)
+document.getElementById('close-share-modal-x').addEventListener('click', closeShareModal)
+
+// Click outside to dismiss share modal
+document.getElementById('share-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'share-modal') {
+    closeShareModal()
+  }
+})
+
+// File modal close buttons
 document.getElementById('close-modal').addEventListener('click', closeModal)
 document.getElementById('close-modal-x').addEventListener('click', closeModal)
 
@@ -675,10 +874,28 @@ document.addEventListener('keydown', (e) => {
     openFilePanel('open')
   }
 
-  // Escape - Close modal
-  if (e.key === 'Escape' && !fileModal.classList.contains('hidden')) {
+  // Ctrl+Shift+S - Share (or Cmd+Shift+S on Mac)
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
     e.preventDefault()
-    e.stopPropagation()
-    closeModal()
+    handleShare()
+  }
+
+  // Escape - Close modals (independent check for each modal)
+  if (e.key === 'Escape') {
+    const shareModal = document.getElementById('share-modal')
+    const fileModalOpen = !fileModal.classList.contains('hidden')
+    const shareModalOpen = !shareModal.classList.contains('hidden')
+
+    if (fileModalOpen) {
+      e.preventDefault()
+      e.stopPropagation()
+      closeModal()
+    }
+
+    if (shareModalOpen) {
+      e.preventDefault()
+      e.stopPropagation()
+      closeShareModal()
+    }
   }
 })
