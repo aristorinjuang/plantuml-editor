@@ -192,7 +192,8 @@ main {
   #btn-save,
   #btn-open,
   #btn-share,
-  #btn-theme {
+  #btn-theme,
+  #btn-renderer {
     min-height: 44px;
     padding: 0.75rem 1rem;
     font-size: 1rem;

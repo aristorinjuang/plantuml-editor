@@ -10,6 +10,7 @@
 - 📋 YOU ARE A UX FACILITATOR, not a content generator
 - 💬 FOCUS on defining component library strategy and custom components
 - 🎯 COLLABORATIVE component planning, not assumption-based design
+- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
 
 ## EXECUTION PROTOCOLS:
 
@@ -29,8 +30,8 @@ This step will generate content and present choices:
 
 ## PROTOCOL INTEGRATION:
 
-- When 'A' selected: Execute {project-root}/_bmad/core/tasks/advanced-elicitation.xml
-- When 'P' selected: Execute {project-root}/_bmad/core/workflows/party-mode/workflow.md
+- When 'A' selected: Read fully and follow: {project-root}/_bmad/core/workflows/advanced-elicitation/workflow.xml
+- When 'P' selected: Read fully and follow: {project-root}/_bmad/core/workflows/party-mode/workflow.md
 - PROTOCOLS always return to this step's A/P/C menu
 - User accepts/rejects protocol changes before proceeding
 
@@ -192,7 +193,7 @@ Show the generated component strategy content and present choices:
 
 #### If 'A' (Advanced Elicitation):
 
-- Execute {project-root}/_bmad/core/tasks/advanced-elicitation.xml with the current component strategy content
+- Read fully and follow: {project-root}/_bmad/core/workflows/advanced-elicitation/workflow.xml with the current component strategy content
 - Process the enhanced component insights that come back
 - Ask user: "Accept these improvements to the component strategy? (y/n)"
 - If yes: Update content with improvements, then return to A/P/C menu
@@ -200,7 +201,7 @@ Show the generated component strategy content and present choices:
 
 #### If 'P' (Party Mode):
 
-- Execute {project-root}/_bmad/core/workflows/party-mode/workflow.md with the current component strategy
+- Read fully and follow: {project-root}/_bmad/core/workflows/party-mode/workflow.md with the current component strategy
 - Process the collaborative component insights that come back
 - Ask user: "Accept these changes to the component strategy? (y/n)"
 - If yes: Update content with improvements, then return to A/P/C menu
@@ -210,7 +211,7 @@ Show the generated component strategy content and present choices:
 
 - Append the final content to `{planning_artifacts}/ux-design-specification.md`
 - Update frontmatter: append step to end of stepsCompleted array
-- Load `./step-12-ux-patterns.md`
+- Load `{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-ux-design/steps/step-12-ux-patterns.md`
 
 ## APPEND TO DOCUMENT:
 
@@ -242,6 +243,6 @@ When user selects 'C', append the content directly to the document using the str
 
 ## NEXT STEP:
 
-After user selects 'C' and content is saved to document, load `./step-12-ux-patterns.md` to define UX consistency patterns.
+After user selects 'C' and content is saved to document, load `{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-ux-design/steps/step-12-ux-patterns.md` to define UX consistency patterns.
 
 Remember: Do NOT proceed to step-12 until user explicitly selects 'C' from the A/P/C menu and content is saved!

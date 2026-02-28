@@ -3,7 +3,6 @@
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
-
 - 📖 CRITICAL: ALWAYS read the complete step file before taking any action - partial understanding leads to incomplete decisions
 - 🔄 CRITICAL: When loading next step with 'C', ensure the entire file is read and understood before proceeding
 - ✅ ALWAYS treat this as collaborative discovery between architectural peers
@@ -11,6 +10,7 @@
 - 💬 FOCUS on initialization and setup only - don't look ahead to future steps
 - 🚪 DETECT existing workflow state and handle continuation properly
 - ⚠️ ABSOLUTELY NO TIME ESTIMATES - AI development speed has fundamentally changed
+- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
 
 ## EXECUTION PROTOCOLS:
 
@@ -44,7 +44,7 @@ First, check if the output document already exists:
 
 If the document exists and has frontmatter with `stepsCompleted`:
 
-- **STOP here** and load `./step-01b-continue.md` immediately
+- **STOP here** and load `{project-root}/_bmad/bmm/workflows/3-solutioning/create-architecture/steps/step-01b-continue.md` immediately
 - Do not proceed with any initialization tasks
 - Let step-01b handle the continuation logic
 
@@ -148,6 +148,6 @@ Ready to begin architectural decision making. Do you have any other documents yo
 
 ## NEXT STEP:
 
-After user selects [C] to continue, only after ensuring all the template output has been created, then load `./step-02-context.md` to analyze the project context and begin architectural decision making.
+After user selects [C] to continue, only after ensuring all the template output has been created, then load `{project-root}/_bmad/bmm/workflows/3-solutioning/create-architecture/steps/step-02-context.md` to analyze the project context and begin architectural decision making.
 
 Remember: Do NOT proceed to step-02 until user explicitly selects [C] from the menu and setup is confirmed!

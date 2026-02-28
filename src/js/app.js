@@ -12,6 +12,9 @@ editor.session.setMode("ace/mode/javascript")
 // Track if we loaded content from URL (to prevent overwriting with default)
 let loadedFromUrl = false
 
+// Track current renderer state
+let currentRenderer = 'frontend' // 'frontend' or 'backend'
+
 // Load shared diagram from URL fragment (new format: #/${encoded})
 const hash = window.location.hash
 if (hash && hash.startsWith('#/')) {
@@ -28,12 +31,58 @@ if (hash && hash.startsWith('#/')) {
 }
 editor.focus()
 
+/**
+ * Encode data using PlantUML's custom base64 alphabet
+ * @param {Uint8Array} data - Binary data to encode
+ * @returns {string} PlantUML-encoded string
+ */
+function encode64(data) {
+  const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_";
+  let result = "";
+  for (let i = 0; i < data.length; i += 3) {
+    const b1 = data[i];
+    const b2 = i + 1 < data.length ? data[i + 1] : 0;
+    const b3 = i + 2 < data.length ? data[i + 2] : 0;
+    const c1 = b1 >> 2;
+    const c2 = ((b1 & 0x3) << 4) | (b2 >> 4);
+    const c3 = ((b2 & 0xf) << 2) | (b3 >> 6);
+    const c4 = b3 & 0x3f;
+    result += alphabet[c1] + alphabet[c2] + alphabet[c3] + alphabet[c4];
+  }
+  return result;
+}
+
+/**
+ * Render PlantUML diagram using back-end service (PlantUML.com)
+ * @param {string} uml - PlantUML text content
+ */
+function _renderBackend(uml) {
+  try {
+    // Encode using deflate compression
+    const utf8 = new TextEncoder().encode(uml);
+    const compressed = pako.deflateRaw(utf8);
+    const encoded = encode64(compressed);
+
+    // Build URL and fetch image
+    const url = `https://www.plantuml.com/plantuml/png/${encoded}`;
+    document.getElementById('render-image').src = url;
+  } catch (error) {
+    console.error('Back-end render error:', error);
+  }
+}
+
 function _render(){
-  plantuml.renderPng(editor.getValue()).then((blob) => {
-    document.getElementById('render-image').src = window.URL.createObjectURL(blob)
-  }).catch((error) => {
-    console.log(error)
-  })
+  if (currentRenderer === 'backend') {
+    // Back-end rendering
+    _renderBackend(editor.getValue());
+  } else {
+    // Front-end rendering (existing logic)
+    plantuml.renderPng(editor.getValue()).then((blob) => {
+      document.getElementById('render-image').src = window.URL.createObjectURL(blob);
+    }).catch((error) => {
+      console.log(error);
+    });
+  }
 }
 
 function debounce(func, delay = 400) {
@@ -64,12 +113,40 @@ function initializeTheme() {
 }
 
 /**
+ * Initialize renderer preference from localStorage or default
+ */
+function initializeRenderer() {
+  try {
+    const savedRenderer = localStorage.getItem(STORAGE_KEYS.RENDERER);
+    currentRenderer = savedRenderer || 'frontend';
+  } catch (error) {
+    console.error('Error reading renderer preference:', error);
+    currentRenderer = 'frontend';
+  }
+  updateRendererIcon(currentRenderer);
+}
+
+/**
  * Set theme and update icon
  * @param {string} theme - 'light' or 'dark'
  */
 function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme)
   updateThemeIcon(theme)
+}
+
+/**
+ * Toggle between front-end and back-end renderers
+ */
+function toggleRenderer() {
+  currentRenderer = currentRenderer === 'frontend' ? 'backend' : 'frontend';
+  try {
+    localStorage.setItem(STORAGE_KEYS.RENDERER, currentRenderer);
+  } catch (error) {
+    console.error('Error saving renderer preference:', error);
+  }
+  updateRendererIcon(currentRenderer);
+  debouncedRender(); // Re-render with new renderer
 }
 
 /**
@@ -94,6 +171,31 @@ function updateThemeIcon(theme) {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
       </svg>
     `
+  }
+}
+
+/**
+ * Update renderer toggle button icon
+ * @param {string} renderer - 'frontend' or 'backend'
+ */
+function updateRendererIcon(renderer) {
+  const rendererIcon = document.getElementById('renderer-icon');
+  if (!rendererIcon) return;
+
+  if (renderer === 'backend') {
+    // Show server/backend icon
+    rendererIcon.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+      </svg>
+    `;
+  } else {
+    // Show client/front-end icon
+    rendererIcon.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    `;
   }
 }
 
@@ -315,6 +417,9 @@ plantuml.initialize(jarPath).then(() => {
   // Initialize theme
   initializeTheme()
 
+  // Initialize renderer
+  initializeRenderer()
+
   // Attach change listeners
   editor.session.on('change', function() {
     debouncedRender()   // Update preview
@@ -432,7 +537,8 @@ function resize(e) {
 
 const STORAGE_KEYS = {
   FILES: 'plantuml-files',
-  DEFAULT: 'plantuml-default'
+  DEFAULT: 'plantuml-default',
+  RENDERER: 'plantuml-renderer'
 }
 
 /**
@@ -827,6 +933,9 @@ document.getElementById('btn-theme').addEventListener('click', () => {
   const newTheme = currentTheme === 'dark' ? 'light' : 'dark'
   setTheme(newTheme)
 })
+
+// Renderer toggle event listener
+document.getElementById('btn-renderer').addEventListener('click', toggleRenderer)
 
 // Share button event listener
 document.getElementById('btn-share').addEventListener('click', handleShare)

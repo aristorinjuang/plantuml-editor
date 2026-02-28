@@ -8,6 +8,7 @@
 - 💬 FOCUS on discovering existing project context and technology stack
 - 🎯 IDENTIFY critical implementation rules that AI agents need
 - ⚠️ ABSOLUTELY NO TIME ESTIMATES - AI development speed has fundamentally changed
+- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
 
 ## EXECUTION PROTOCOLS:
 
@@ -178,6 +179,6 @@ Ready to create/update your project context. This will help AI agents implement 
 
 ## NEXT STEP:
 
-After user selects [C] to continue, load `./step-02-generate.md` to collaboratively generate the specific project context rules.
+After user selects [C] to continue, load `{project-root}/_bmad/bmm/workflows/generate-project-context/steps/step-02-generate.md` to collaboratively generate the specific project context rules.
 
 Remember: Do NOT proceed to step-02 until user explicitly selects [C] from the menu and discovery is confirmed and the initial file has been written as directed in this discovery step!
