@@ -189,6 +189,7 @@ main {
 
   /* Enhanced touch targets (Task 4) */
   /* Toolbar buttons - 44px minimum for iOS HIG */
+  #btn-new,
   #btn-save,
   #btn-open,
   #btn-share,

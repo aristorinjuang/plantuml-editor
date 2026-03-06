@@ -127,6 +127,16 @@ function initializeRenderer() {
 }
 
 /**
+ * Initialize copyright year with current year
+ */
+function initializeCopyrightYear() {
+  const copyrightYearSpan = document.getElementById('copyright-year');
+  if (copyrightYearSpan) {
+    copyrightYearSpan.textContent = new Date().getFullYear();
+  }
+}
+
+/**
  * Set theme and update icon
  * @param {string} theme - 'light' or 'dark'
  */
@@ -385,6 +395,25 @@ async function handleShare() {
   showShareNotification(url, copySuccess)
 }
 
+/**
+ * Handle New button click - reset editor to default template
+ */
+function handleNew() {
+  const defaultTemplate = '@startuml\nBob -> Alice: Hello!\n@enduml';
+  const currentContent = editor.getValue();
+
+  // Always ask for confirmation
+  const confirmed = confirm('Create a new diagram? Any unsaved changes will be lost.');
+
+  if (confirmed) {
+    editor.setValue(defaultTemplate, -1);
+    editor.focus();
+    debouncedRender();
+    // Clear auto-save by resetting default file
+    saveDefaultFile(defaultTemplate);
+  }
+}
+
 // ============================================================================
 // AUTO-SAVE FUNCTIONALITY
 // ============================================================================
@@ -419,6 +448,9 @@ plantuml.initialize(jarPath).then(() => {
 
   // Initialize renderer
   initializeRenderer()
+
+  // Initialize copyright year
+  initializeCopyrightYear()
 
   // Attach change listeners
   editor.session.on('change', function() {
@@ -926,6 +958,7 @@ function escapeHtml(text) {
 // Event Listeners for Modal
 document.getElementById('btn-save').addEventListener('click', () => openFilePanel('save'))
 document.getElementById('btn-open').addEventListener('click', () => openFilePanel('open'))
+document.getElementById('btn-new').addEventListener('click', handleNew)
 
 // Theme toggle event listener
 document.getElementById('btn-theme').addEventListener('click', () => {
@@ -981,6 +1014,12 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.key === 'o') {
     e.preventDefault()
     openFilePanel('open')
+  }
+
+  // Ctrl+Alt+N - New Diagram
+  if ((e.ctrlKey || e.metaKey) && e.altKey && e.key === 'n') {
+    e.preventDefault()
+    handleNew()
   }
 
   // Ctrl+Shift+S - Share (or Cmd+Shift+S on Mac)
