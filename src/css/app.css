@@ -8,6 +8,10 @@
   --preview-bg: #ffffff;
   --preview-text: #1f2937;
   --preview-border: #e5e7eb;
+  --button-bg: #ffffff;
+  --button-text: #1A4F63;
+  --button-hover: #f3f4f6;
+  --button-border: #d1d5db;
 }
 
 [data-theme="dark"] {
@@ -63,6 +67,11 @@ main {
 
 #file-list > div:hover {
   background-color: #f9fafb;
+}
+
+/* Add cursor pointer to all buttons in file modal on hover */
+#file-modal button:hover {
+  cursor: pointer;
 }
 
 #file-modal {

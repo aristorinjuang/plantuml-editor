@@ -103,13 +103,22 @@ const debouncedRender = debounce(() => _render())
 // ============================================================================
 
 /**
- * Initialize theme based on system preference
+ * Initialize theme based on saved preference or system preference
  */
 function initializeTheme() {
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  const currentTheme = prefersDark ? 'dark' : 'light'
-  document.documentElement.setAttribute('data-theme', currentTheme)
-  updateThemeIcon(currentTheme)
+  try {
+    const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const currentTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    updateThemeIcon(currentTheme);
+  } catch (error) {
+    console.error('Error reading theme preference:', error);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const currentTheme = prefersDark ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    updateThemeIcon(currentTheme);
+  }
 }
 
 /**
@@ -141,8 +150,13 @@ function initializeCopyrightYear() {
  * @param {string} theme - 'light' or 'dark'
  */
 function setTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme)
-  updateThemeIcon(theme)
+  document.documentElement.setAttribute('data-theme', theme);
+  try {
+    localStorage.setItem(STORAGE_KEYS.THEME, theme);
+  } catch (error) {
+    console.error('Error saving theme preference:', error);
+  }
+  updateThemeIcon(theme);
 }
 
 /**
@@ -570,7 +584,8 @@ function resize(e) {
 const STORAGE_KEYS = {
   FILES: 'plantuml-files',
   DEFAULT: 'plantuml-default',
-  RENDERER: 'plantuml-renderer'
+  RENDERER: 'plantuml-renderer',
+  THEME: 'plantuml-theme'
 }
 
 /**
@@ -869,14 +884,14 @@ function renderFileList() {
         ${file.id !== 'default' ? `
           <button
             onclick="handleDeleteFile('${file.id}')"
-            class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-sm rounded transition-colors"
+            class="px-3 py-1 bg-white hover:bg-gray-100 text-[#1A4F63] text-sm rounded transition-colors border border-gray-300"
           >
             Delete
           </button>
         ` : ''}
         <button
           onclick="handleOpenFile('${file.id}')"
-          class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded transition-colors"
+          class="px-3 py-1 bg-white hover:bg-gray-100 text-[#1A4F63] text-sm rounded transition-colors border border-gray-300"
         >
           ${file.id === 'default' ? 'Reload' : 'Open'}
         </button>
@@ -1045,5 +1060,19 @@ document.addEventListener('keydown', (e) => {
       e.stopPropagation()
       closeShareModal()
     }
+  }
+
+  // Alt+T - Toggle Theme
+  if (e.altKey && (e.key === 't' || e.key === 'T')) {
+    e.preventDefault()
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light'
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark'
+    setTheme(newTheme)
+  }
+
+  // Alt+R - Toggle Renderer
+  if (e.altKey && (e.key === 'r' || e.key === 'R')) {
+    e.preventDefault()
+    toggleRenderer()
   }
 })
