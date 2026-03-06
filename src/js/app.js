@@ -15,6 +15,12 @@ let loadedFromUrl = false
 // Track current renderer state
 let currentRenderer = 'frontend' // 'frontend' or 'backend'
 
+// Track last saved content for change detection
+let lastSavedContent = ''
+
+// Track current diagram name for this tab (not shared across tabs)
+let currentDiagramName = null
+
 // Load shared diagram from URL fragment (new format: #/${encoded})
 const hash = window.location.hash
 if (hash && hash.startsWith('#/')) {
@@ -223,6 +229,18 @@ function updateRendererIcon(renderer) {
   }
 }
 
+/**
+ * Update window title with diagram name
+ * @param {string} diagramName - Name of the current diagram, or null/undefined to reset
+ */
+function updateWindowTitle(diagramName) {
+  if (diagramName && diagramName.trim()) {
+    document.title = `PlantUML Editor - ${diagramName}`
+  } else {
+    document.title = 'PlantUML Editor'
+  }
+}
+
 async function loadFromUrl(url){
   window.location.hash = `#example=${url}`
 
@@ -338,6 +356,7 @@ async function copyToClipboard(text) {
 
 // Track auto-dismiss timer to prevent race conditions
 let shareModalTimer = null
+let notificationTimer = null
 
 /**
  * Show share notification modal with URL
@@ -394,6 +413,49 @@ function closeShareModal() {
 }
 
 /**
+ * Show notification message in bottom-left corner
+ * @param {string} message - Notification message to display
+ * @param {string} type - Notification type: 'success' or 'error'
+ */
+function showNotification(message, type = 'success') {
+  const notification = document.getElementById('notification')
+  const notificationMessage = document.getElementById('notification-message')
+
+  if (!notification || !notificationMessage) {
+    console.error('Notification elements not found')
+    return
+  }
+
+  // Clear any existing timer to prevent race conditions
+  if (notificationTimer !== null) {
+    clearTimeout(notificationTimer)
+    notificationTimer = null
+  }
+
+  // Set message
+  notificationMessage.textContent = message
+
+  // Set styling based on type
+  const notificationDiv = notification.querySelector('div')
+  if (type === 'success') {
+    notificationDiv.className = 'px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 bg-green-100 text-green-800'
+  } else if (type === 'error') {
+    notificationDiv.className = 'px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 bg-red-100 text-red-800'
+  } else {
+    notificationDiv.className = 'px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 bg-gray-100 text-gray-800'
+  }
+
+  // Show notification
+  notification.classList.remove('hidden')
+
+  // Auto-dismiss after 3 seconds
+  notificationTimer = setTimeout(() => {
+    notification.classList.add('hidden')
+    notificationTimer = null
+  }, 3000)
+}
+
+/**
  * Handle share button click - orchestrate share flow
  */
 async function handleShare() {
@@ -438,6 +500,51 @@ const debouncedAutoSave = debounce(() => {
   saveDefaultFile(content)
 }, 2000)
 
+/**
+ * Restore editor state from localStorage
+ * @returns {boolean} True if state was restored, false otherwise
+ */
+function restoreEditorState() {
+  try {
+    const stateJson = localStorage.getItem(STORAGE_KEYS.EDITOR_STATE)
+    if (!stateJson) {
+      return false
+    }
+
+    const state = JSON.parse(stateJson)
+
+    // Validate state structure
+    if (!state.diagramName || !state.content || !state.timestamp) {
+      console.warn('Invalid editor state structure')
+      localStorage.removeItem(STORAGE_KEYS.EDITOR_STATE)
+      return false
+    }
+
+    // Check if diagram still exists
+    const files = getAllFiles()
+    const diagramExists = files.some(f => f.name === state.diagramName)
+
+    if (!diagramExists) {
+      console.warn('Saved diagram no longer exists:', state.diagramName)
+      localStorage.removeItem(STORAGE_KEYS.EDITOR_STATE)
+      return false
+    }
+
+    // Restore state
+    editor.setValue(state.content, -1)
+    editor.focus()
+    currentDiagramName = state.diagramName
+    lastSavedContent = state.content
+    updateWindowTitle(state.diagramName)
+
+    return true
+  } catch (error) {
+    console.error('Error restoring editor state:', error)
+    localStorage.removeItem(STORAGE_KEYS.EDITOR_STATE)
+    return false
+  }
+}
+
 // Load default file content on startup
 function initializeDefaultFile() {
   const defaultContent = loadDefaultFile()
@@ -446,13 +553,22 @@ function initializeDefaultFile() {
 }
 
 plantuml.initialize(jarPath).then(() => {
-  // Initialize default file content (only if not loaded from URL)
-  if (!loadedFromUrl) {
+  // Try to restore editor state
+  const restored = restoreEditorState()
+
+  // Initialize default file content (only if not restored and not loaded from URL)
+  if (!restored && !loadedFromUrl) {
     initializeDefaultFile()
   }
 
   // Initial render
-  debouncedRender()
+  if (restored) {
+    // Render the restored diagram
+    debouncedRender()
+  } else {
+    // Initial render for new/loaded content
+    debouncedRender()
+  }
 
   // Initialize tab state for mobile
   initializeTabs()
@@ -585,7 +701,8 @@ const STORAGE_KEYS = {
   FILES: 'plantuml-files',
   DEFAULT: 'plantuml-default',
   RENDERER: 'plantuml-renderer',
-  THEME: 'plantuml-theme'
+  THEME: 'plantuml-theme',
+  EDITOR_STATE: 'plantuml_editor_state'
 }
 
 /**
@@ -650,6 +767,59 @@ function saveDefaultFile(content) {
     saveAllFiles(files)
   } catch (error) {
     console.error('Error saving default file:', error)
+  }
+}
+
+/**
+ * Handle Save (Ctrl+S) - Save to current diagram without dialog
+ */
+function handleSave() {
+  // If no current diagram in this tab, fallback to Save As
+  if (!currentDiagramName) {
+    openFilePanel('save')
+    return
+  }
+
+  const files = getAllFiles()
+  const diagramIndex = files.findIndex(f => f.name === currentDiagramName)
+
+  // Validate diagram still exists
+  if (diagramIndex === -1) {
+    showNotification(`Current diagram '${currentDiagramName}' no longer exists`, 'error')
+    currentDiagramName = null
+    localStorage.removeItem(STORAGE_KEYS.EDITOR_STATE)
+    updateWindowTitle(null)
+    return
+  }
+
+  const content = editor.getValue()
+
+  // Update file content and timestamp
+  files[diagramIndex].content = content
+  files[diagramIndex].lastModified = new Date().toISOString()
+
+  try {
+    saveAllFiles(files)
+
+    // Compare content with last saved content
+    if (content !== lastSavedContent) {
+      showNotification(`Saved to '${currentDiagramName}'`, 'success')
+      lastSavedContent = content
+    }
+
+    // Save editor state for refresh recovery
+    const editorState = {
+      diagramName: currentDiagramName,
+      content: content,
+      timestamp: Date.now()
+    }
+    localStorage.setItem(STORAGE_KEYS.EDITOR_STATE, JSON.stringify(editorState))
+
+    // Update window title
+    updateWindowTitle(currentDiagramName)
+  } catch (error) {
+    console.error('Error saving diagram:', error)
+    showNotification('Failed to save diagram', 'error')
   }
 }
 
@@ -770,13 +940,8 @@ function validateFileName(name, files = null) {
     return { valid: false, error: 'Reserved file name' }
   }
 
-  if (files === null) {
-    files = getAllFiles()
-  }
-
-  if (files.some(f => f.name === name)) {
-    return { valid: false, error: 'File name already exists' }
-  }
+  // Note: We no longer check if file already exists here
+  // handleSaveAs() handles existing files with a confirmation dialog
 
   return { valid: true }
 }
@@ -920,6 +1085,14 @@ function handleSaveAs() {
   nameError.classList.add('hidden')
   fileNameInput.classList.remove('border-red-500')
 
+  // Check if file already exists
+  const existingFile = files.find(f => f.name === name)
+  if (existingFile) {
+    // Show overwrite confirmation
+    confirmOverwrite(name)
+    return
+  }
+
   // Get current content from editor
   const content = editor.getValue()
 
@@ -927,11 +1100,131 @@ function handleSaveAs() {
   const newFile = saveFile(name, content)
   if (newFile) {
     console.log('File saved:', newFile.name)
+
+    // Set as current diagram in this tab
+    currentDiagramName = name
+
+    // Save editor state
+    const editorState = {
+      diagramName: name,
+      content: content,
+      timestamp: Date.now()
+    }
+    localStorage.setItem(STORAGE_KEYS.EDITOR_STATE, JSON.stringify(editorState))
+
+    // Update tracking
+    lastSavedContent = content
+    updateWindowTitle(name)
+
     closeModal()
   } else {
     nameError.textContent = 'Failed to save file'
     nameError.classList.remove('hidden')
   }
+}
+
+/**
+ * Show confirmation dialog for overwriting existing file
+ * @param {string} diagramName - Name of the diagram to overwrite
+ */
+function confirmOverwrite(diagramName) {
+  // Create confirmation modal
+  const confirmModal = document.createElement('div')
+  confirmModal.id = 'confirm-overwrite-modal'
+  confirmModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center'
+  confirmModal.style.zIndex = '1002' // Higher than file modal (1000) and share modal (1001)
+
+  // Create modal content safely (avoid XSS by using textContent for dynamic content)
+  const modalContent = document.createElement('div')
+  modalContent.className = 'bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4'
+
+  const title = document.createElement('h3')
+  title.className = 'text-lg font-semibold text-gray-900 mb-2'
+  title.textContent = 'Overwrite File?'
+
+  const message = document.createElement('p')
+  message.className = 'text-gray-600 mb-6'
+  message.textContent = `File '${diagramName}' already exists. Overwrite?`
+
+  const buttonContainer = document.createElement('div')
+  buttonContainer.className = 'flex justify-end gap-3'
+
+  const cancelBtn = document.createElement('button')
+  cancelBtn.className = 'px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition cursor-pointer'
+  cancelBtn.textContent = 'Cancel'
+
+  const confirmBtn = document.createElement('button')
+  confirmBtn.className = 'px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition cursor-pointer'
+  confirmBtn.textContent = 'Overwrite'
+
+  buttonContainer.appendChild(cancelBtn)
+  buttonContainer.appendChild(confirmBtn)
+
+  modalContent.appendChild(title)
+  modalContent.appendChild(message)
+  modalContent.appendChild(buttonContainer)
+
+  confirmModal.appendChild(modalContent)
+  document.body.appendChild(confirmModal)
+
+  // Add event listeners
+  cancelBtn.addEventListener('click', () => {
+    document.body.removeChild(confirmModal)
+    // Return to Save As input field
+    fileNameInput.focus()
+  })
+
+  confirmBtn.addEventListener('click', () => {
+    const content = editor.getValue()
+    const files = getAllFiles()
+    const fileIndex = files.findIndex(f => f.name === diagramName)
+
+    if (fileIndex >= 0) {
+      // Update existing file
+      files[fileIndex].content = content
+      files[fileIndex].lastModified = new Date().toISOString()
+      saveAllFiles(files)
+
+      // Set as current diagram in this tab
+      currentDiagramName = diagramName
+
+      // Save editor state
+      const editorState = {
+        diagramName: diagramName,
+        content: content,
+        timestamp: Date.now()
+      }
+      localStorage.setItem(STORAGE_KEYS.EDITOR_STATE, JSON.stringify(editorState))
+
+      // Update tracking
+      lastSavedContent = content
+      updateWindowTitle(diagramName)
+
+      // Show success notification
+      showNotification(`Saved to '${diagramName}'`, 'success')
+
+      // Remove confirmation modal
+      document.body.removeChild(confirmModal)
+
+      // Close the Save As modal
+      closeModal()
+    }
+  })
+
+  // Handle Enter key to confirm
+  confirmBtn.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      e.stopPropagation()
+      confirmBtn.click()
+    }
+  })
+
+  // Focus on the confirm button after a small delay to ensure modal is rendered
+  // and to prevent the previous Enter key event from triggering it
+  setTimeout(() => {
+    confirmBtn.focus()
+  }, 100)
 }
 
 /**
@@ -941,6 +1234,27 @@ function handleSaveAs() {
 function handleOpenFile(fileId) {
   const success = loadFileIntoEditor(fileId)
   if (success) {
+    // Get the file object to retrieve its name
+    const files = getAllFiles()
+    const file = files.find(f => f.id === fileId)
+
+    if (file) {
+      // Set as current diagram in this tab
+      currentDiagramName = file.name
+
+      // Save editor state
+      const editorState = {
+        diagramName: file.name,
+        content: file.content,
+        timestamp: Date.now()
+      }
+      localStorage.setItem(STORAGE_KEYS.EDITOR_STATE, JSON.stringify(editorState))
+
+      // Update tracking
+      lastSavedContent = file.content
+      updateWindowTitle(file.name)
+    }
+
     closeModal()
     debouncedRender()
   }
@@ -1006,7 +1320,11 @@ document.getElementById('close-modal-x').addEventListener('click', closeModal)
 // Handle Enter key in file name input
 fileNameInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
+    e.preventDefault() // Prevent Enter from propagating to other elements
     handleSaveAs()
+
+    // If confirmation modal was created, don't do anything else
+    // The modal will handle the user's confirmation
   }
 })
 
@@ -1019,10 +1337,19 @@ window.handleOpenFile = handleOpenFile
 // ============================================================================
 
 document.addEventListener('keydown', (e) => {
-  // Ctrl+S - Save As
-  if (e.ctrlKey && e.key === 's') {
+  // Ctrl+Shift+S - Save As (check before other combinations)
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && (e.key === 'S' || e.key === 's' || e.keyCode === 83 || e.code === 'KeyS')) {
     e.preventDefault()
+    e.stopPropagation()
     openFilePanel('save')
+    return
+  }
+
+  // Ctrl+S - Save (only if Alt and Shift are NOT pressed)
+  if (e.ctrlKey && !e.altKey && !e.shiftKey && (e.key === 's' || e.key === 'S' || e.keyCode === 83)) {
+    e.preventDefault()
+    handleSave()
+    return
   }
 
   // Ctrl+O - Open File
@@ -1037,10 +1364,11 @@ document.addEventListener('keydown', (e) => {
     handleNew()
   }
 
-  // Ctrl+Shift+S - Share (or Cmd+Shift+S on Mac)
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
+  // Ctrl+Shift+U - Share URL (or Cmd+Shift+U on Mac)
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'U' || e.key === 'u' || e.keyCode === 85)) {
     e.preventDefault()
     handleShare()
+    return
   }
 
   // Escape - Close modals (independent check for each modal)

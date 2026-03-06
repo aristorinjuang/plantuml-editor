@@ -53,6 +53,7 @@ main {
   width: 11px;
 }
 #logo-title{
+  line-height: 2rem;
   padding-left: 40px;
   background-image: url("/images/logo.svg") !important;
   background-repeat: no-repeat !important;
@@ -108,6 +109,19 @@ main {
   font-size: 0.875rem;
 }
 
+/* Notification Styles */
+#notification {
+  transition: opacity 0.3s ease-in-out;
+}
+#notification.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+#notification:not(.hidden) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* ============================================================================
    RESPONSIVE HEADER LAYOUT
    ============================================================================ */
@@ -128,8 +142,7 @@ main {
 
   .header-container #logo-title {
     text-align: center;
-    padding-left: 40px;
-    background-position: calc(50% - 68px) center !important;
+    background-position: calc(50% - 86px) center !important;
   }
 
   .header-container .flex.gap-2 {
@@ -219,7 +232,7 @@ main {
   /* Toolbar layout optimization (Task 5) */
   #logo-title {
     font-size: 1rem;
-    padding-left: 2.5rem;
+    padding-left: 0;
   }
 
   /* Reduce gap between logo and buttons */
