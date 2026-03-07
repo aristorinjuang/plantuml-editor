@@ -39,61 +39,12 @@ main {
   filter: invert(0.92) hue-rotate(180deg);
   transition: filter 0.3s ease;
 }
-.ts-control {
-  background-color: #1a2234 !important;
-  color: #f8fafc !important;
-  border-color: #243049 !important;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23a5a9b1' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
-  background-repeat: no-repeat !important;
-  background-position: right 6px center !important;
-  background-size: 16px 12px !important;
-}
-#resizer {
-  cursor: ew-resize;
-  width: 11px;
-}
-#logo-title{
-  line-height: 2rem;
-  padding-left: 40px;
-  background-image: url("/images/logo.svg") !important;
-  background-repeat: no-repeat !important;
-  background-position: left center !important;
-  background-size: 30px 30px !important;
-}
 
-/* File Panel Modal Styles */
-#file-list > div {
-  transition: background-color 0.15s ease-in-out;
-}
+/* ============================================================================
+   MODAL VISIBILITY STATES
+   ============================================================================ */
 
-#file-list > div:hover {
-  background-color: #f9fafb;
-}
-
-/* Add cursor pointer to all buttons in file modal on hover */
-#file-modal button:hover {
-  cursor: pointer;
-}
-
-#file-modal {
-  transition: opacity 0.2s ease-in-out;
-}
-
-#file-modal.hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-
-#file-modal:not(.hidden) {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Share Modal Styles */
-#share-modal {
-  transition: opacity 0.2s ease-in-out;
-}
-
+/* Share Modal */
 #share-modal.hidden {
   opacity: 0;
   pointer-events: none;
@@ -104,151 +55,53 @@ main {
   pointer-events: auto;
 }
 
-#share-url {
-  font-family: monospace;
-  font-size: 0.875rem;
+/* File Modal */
+#file-modal.hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
-/* Notification Styles */
-#notification {
-  transition: opacity 0.3s ease-in-out;
+#file-modal:not(.hidden) {
+  opacity: 1;
+  pointer-events: auto;
 }
+
+/* Notification */
 #notification.hidden {
   opacity: 0;
   pointer-events: none;
 }
+
 #notification:not(.hidden) {
   opacity: 1;
   pointer-events: auto;
 }
 
 /* ============================================================================
-   RESPONSIVE HEADER LAYOUT
+   TOM SELECT OVERRIDES
    ============================================================================ */
 
-.header-container {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-direction: row;
-}
-
-@media (max-width: 810px) {
-  .header-container {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
-  }
-
-  .header-container #logo-title {
-    text-align: center;
-    background-position: calc(50% - 86px) center !important;
-  }
-
-  .header-container .flex.gap-2 {
-    justify-content: center;
-  }
+.ts-control {
+  background-color: #1a2234 !important;
+  color: #f8fafc !important;
+  border-color: #243049 !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23a5a9b1' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 6px center !important;
+  background-size: 16px 12px !important;
 }
 
 /* ============================================================================
-   RESPONSIVE LAYOUT - MOBILE (≤ 810px)
+   RESPONSIVE OVERRIDES
    ============================================================================ */
 
-/* Hide tabs by default (desktop first) */
-#tab-navigation {
-  display: none;
+/* Hide Ace Editor's mobile menu */
+.ace_mobile-menu {
+  display: none !important;
 }
 
-@media (max-width: 810px) {
-  /* Hide Ace Editor's mobile menu */
-  .ace_mobile-menu {
-    display: none !important;
-  }
-
-  /* Make container full-width on mobile */
-  .container {
-    max-width: none !important;
-    width: 100% !important;
-    padding: 0 !important;
-  }
-
-  /* Show tab navigation on mobile */
-  #tab-navigation {
-    display: flex !important;
-    width: 100% !important;
-    max-width: none !important;
-  }
-
-  /* Make panels full-width on mobile - but only if visible */
-  #sidePanel {
-    width: 100% !important;
-    flex: 1 1 100% !important;
-  }
-
-  #sidePanel.hidden {
-    display: none !important;
-  }
-
-  main {
-    width: 100% !important;
-    padding: 1rem;
-    flex: 1 1 100% !important;
-  }
-
-  main.hidden {
-    display: none !important;
-  }
-
-  /* Adjust editor height to account for tab navigation (48px) */
-  #editor {
-    height: calc(100vh - 48px);
-  }
-
-  /* Hide resizer on mobile */
-  #resizer {
-    display: none !important;
-  }
-
-  /* Enhanced touch targets (Task 4) */
-  /* Toolbar buttons - 44px minimum for iOS HIG */
-  #btn-new,
-  #btn-save,
-  #btn-open,
-  #btn-share,
-  #btn-theme,
-  #btn-renderer {
-    min-height: 44px;
-    padding: 0.75rem 1rem;
-    font-size: 1rem;
-  }
-
-  /* Tab buttons - 48px for better touch targets */
-  #tab-code,
-  #tab-preview {
-    min-height: 48px;
-    font-size: 1.125rem;
-  }
-
-  /* Toolbar layout optimization (Task 5) */
-  #logo-title {
-    font-size: 1rem;
-    padding-left: 0;
-  }
-
-  /* Reduce gap between logo and buttons */
-  .flex.items-center.justify-between {
-    gap: 0.5rem;
-  }
-}
-
-/* ============================================================================
-   RESPONSIVE LAYOUT - DESKTOP (> 810px)
-   ============================================================================ */
-
+/* Ensure both panels visible on desktop */
 @media (min-width: 811px) {
-  /* Tab navigation already hidden by default rule above */
-
-  /* Ensure both panels visible on desktop */
   #sidePanel,
   main {
     display: block !important;
@@ -257,11 +110,6 @@ main {
 
   #sidePanel.hidden,
   main.hidden {
-    display: block !important;
-  }
-
-  /* Ensure resizer visible on desktop */
-  #resizer {
     display: block !important;
   }
 }

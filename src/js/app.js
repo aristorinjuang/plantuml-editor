@@ -265,7 +265,7 @@ const jarPath = "/app" + pathname + "jar"
  */
 function encodePlantuml(text) {
   // Use browser's built-in btoa with UTF-8 handling
-  const utf8Bytes = encodeURIComponent(text).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+  const utf8Bytes = encodeURIComponent(text).replace(/%([0-9A-F]{2})/g, (_match, p1) => {
     return String.fromCharCode('0x' + p1)
   })
   const base64 = btoa(utf8Bytes)
@@ -318,38 +318,16 @@ function generateShareUrl() {
 }
 
 /**
- * Copy text to clipboard using modern Clipboard API with fallback
+ * Copy text to clipboard using modern Clipboard API
  * @param {string} text - Text to copy
  * @returns {Promise<boolean>} True if successful, false otherwise
  */
 async function copyToClipboard(text) {
-  // Try modern Clipboard API first
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    try {
-      await navigator.clipboard.writeText(text)
-      return true
-    } catch (error) {
-      console.error('Clipboard API failed, trying fallback:', error)
-    }
-  }
-
-  // Fallback: Use document.execCommand('copy')
   try {
-    const textArea = document.createElement('textarea')
-    textArea.value = text
-    textArea.style.position = 'fixed'
-    textArea.style.left = '-9999px'
-    textArea.style.top = '-9999px'
-    document.body.appendChild(textArea)
-    textArea.focus()
-    textArea.select()
-
-    const successful = document.execCommand('copy')
-    document.body.removeChild(textArea)
-
-    return successful
+    await navigator.clipboard.writeText(text)
+    return true
   } catch (error) {
-    console.error('Fallback clipboard copy also failed:', error)
+    console.error('Failed to copy to clipboard:', error)
     return false
   }
 }
@@ -476,7 +454,6 @@ async function handleShare() {
  */
 function handleNew() {
   const defaultTemplate = '@startuml\nBob -> Alice: Hello!\n@enduml';
-  const currentContent = editor.getValue();
 
   // Always ask for confirmation
   const confirmed = confirm('Create a new diagram? Any unsaved changes will be lost.');
@@ -642,6 +619,8 @@ panzoom(element)
 
 function switchTab(tab) {
   activeTab = tab
+  let activeTabColor = 'border-[#B0B0B0]'
+  let inactiveTabColor = 'border-transparent'
 
   if (tab === 'code') {
     // Show code panel, hide preview
@@ -649,10 +628,10 @@ function switchTab(tab) {
     mainPanel.classList.add('hidden')
 
     // Update tab styles
-    tabCode.classList.add('border-blue-500', 'text-white')
-    tabCode.classList.remove('border-transparent', 'text-gray-400')
-    tabPreview.classList.remove('border-blue-500', 'text-white')
-    tabPreview.classList.add('border-transparent', 'text-gray-400')
+    tabCode.classList.add(activeTabColor, 'text-white')
+    tabCode.classList.remove(inactiveTabColor, 'text-gray-400')
+    tabPreview.classList.remove(activeTabColor, 'text-white')
+    tabPreview.classList.add(inactiveTabColor, 'text-gray-400')
 
     // Focus editor
     editor.focus()
@@ -662,10 +641,10 @@ function switchTab(tab) {
     mainPanel.classList.remove('hidden')
 
     // Update tab styles
-    tabPreview.classList.add('border-blue-500', 'text-white')
-    tabPreview.classList.remove('border-transparent', 'text-gray-400')
-    tabCode.classList.remove('border-blue-500', 'text-white')
-    tabCode.classList.add('border-transparent', 'text-gray-400')
+    tabPreview.classList.add(activeTabColor, 'text-white')
+    tabPreview.classList.remove(inactiveTabColor, 'text-gray-400')
+    tabCode.classList.remove(activeTabColor, 'text-white')
+    tabCode.classList.add(inactiveTabColor, 'text-gray-400')
 
     // Auto-render when switching to preview
     _render()
@@ -931,7 +910,7 @@ function loadFileIntoEditor(fileId) {
  * @param {Array} files - Existing files array
  * @returns {Object} Validation result {valid: boolean, error: string}
  */
-function validateFileName(name, files = null) {
+function validateFileName(name, _files = null) {
   if (!name || name.trim() === '') {
     return { valid: false, error: 'File name cannot be empty' }
   }
@@ -1338,7 +1317,7 @@ window.handleOpenFile = handleOpenFile
 
 document.addEventListener('keydown', (e) => {
   // Ctrl+Shift+S - Save As (check before other combinations)
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && (e.key === 'S' || e.key === 's' || e.keyCode === 83 || e.code === 'KeyS')) {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && (e.key === 'S' || e.key === 's' || e.code === 'KeyS')) {
     e.preventDefault()
     e.stopPropagation()
     openFilePanel('save')
@@ -1346,7 +1325,7 @@ document.addEventListener('keydown', (e) => {
   }
 
   // Ctrl+S - Save (only if Alt and Shift are NOT pressed)
-  if (e.ctrlKey && !e.altKey && !e.shiftKey && (e.key === 's' || e.key === 'S' || e.keyCode === 83)) {
+  if (e.ctrlKey && !e.altKey && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
     e.preventDefault()
     handleSave()
     return
@@ -1365,7 +1344,7 @@ document.addEventListener('keydown', (e) => {
   }
 
   // Ctrl+Shift+U - Share URL (or Cmd+Shift+U on Mac)
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'U' || e.key === 'u' || e.keyCode === 85)) {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'U' || e.key === 'u' || e.code === 'KeyU')) {
     e.preventDefault()
     handleShare()
     return
