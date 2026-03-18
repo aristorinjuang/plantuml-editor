@@ -9,6 +9,16 @@ const editor = ace.edit("editor")
 editor.setTheme("ace/theme/monokai")
 editor.session.setMode("ace/mode/javascript")
 
+// Remap ACE Editor's find command from Ctrl+F to Ctrl+Shift+F
+// This allows Ctrl+F to trigger the browser's native find feature
+editor.commands.addCommand({
+  name: 'find',
+  bindKey: {win: 'Ctrl-Shift-F', mac: 'Command-Shift-F'},
+  exec: function(editor) {
+    editor.execCommand('find');
+  }
+});
+
 // Track if we loaded content from URL (to prevent overwriting with default)
 let loadedFromUrl = false
 
