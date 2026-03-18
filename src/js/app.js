@@ -31,6 +31,11 @@ let lastSavedContent = ''
 // Track current diagram name for this tab (not shared across tabs)
 let currentDiagramName = null
 
+// Custom tab system for managing multiple diagrams
+const MAX_TABS = 15
+let tabs = [] // Array of tab objects: { id, fileId, name, isUnsaved }
+let activeTabId = null // ID of currently active tab
+
 // Load shared diagram from URL fragment (new format: #/${encoded})
 const hash = window.location.hash
 if (hash && hash.startsWith('#/')) {
@@ -240,16 +245,175 @@ function updateRendererIcon(renderer) {
 }
 
 /**
- * Update window title with diagram name
- * @param {string} diagramName - Name of the current diagram, or null/undefined to reset
+ * Update window title (always static now)
+ * @param {string} diagramName - Ignored, kept for backward compatibility
  */
-function updateWindowTitle(diagramName) {
-  if (diagramName && diagramName.trim()) {
-    document.title = `PlantUML Editor - ${diagramName}`
+function updateWindowTitle(_diagramName) {
+  document.title = 'PlantUML Editor'
+}
+
+// ============================================================================
+// CUSTOM TAB SYSTEM FOR MULTIPLE DIAGRAMS
+// ============================================================================
+
+/**
+ * Generate a unique tab ID
+ * @returns {string} Unique tab ID
+ */
+function generateTabId() {
+  return 'tab-' + Date.now() + '-' + Math.random().toString(36).substring(2, 11)
+}
+
+/**
+ * Create a new tab
+ * @param {string} fileId - localStorage file ID
+ * @param {string} name - Tab display name
+ * @returns {string} New tab ID
+ */
+function createTab(fileId, name) {
+  if (tabs.length >= MAX_TABS) {
+    showNotification(`Maximum tab limit (${MAX_TABS}) reached`, 'error')
+    return null
+  }
+
+  const tabId = generateTabId()
+  const newTab = {
+    id: tabId,
+    fileId: fileId,
+    name: name,
+    isUnsaved: false
+  }
+
+  tabs.push(newTab)
+  return tabId
+}
+
+/**
+ * Switch to a different tab
+ * @param {string} tabId - ID of tab to switch to
+ */
+function switchToTab(tabId) {
+  const tab = tabs.find(t => t.id === tabId)
+  if (!tab) {
+    console.error('Tab not found:', tabId)
+    return
+  }
+
+  // Save current tab content before switching
+  if (activeTabId) {
+    const currentTab = tabs.find(t => t.id === activeTabId)
+    if (currentTab) {
+      // Save current content to the tab's file
+      const content = editor.getValue()
+      const files = getAllFiles()
+      const fileIndex = files.findIndex(f => f.id === currentTab.fileId)
+
+      if (fileIndex >= 0) {
+        files[fileIndex].content = content
+        files[fileIndex].lastModified = new Date().toISOString()
+        saveAllFiles(files)
+      }
+    }
+  }
+
+  // Load new tab's content
+  const files = getAllFiles()
+  const file = files.find(f => f.id === tab.fileId)
+
+  if (file) {
+    editor.setValue(file.content, -1)
+    currentDiagramName = file.name
+    lastSavedContent = file.content
+  }
+
+  // Update active tab
+  activeTabId = tabId
+
+  // Re-render tabs
+  renderTabs()
+  debouncedRender()
+}
+
+/**
+ * Close a tab
+ * @param {string} tabId - ID of tab to close
+ */
+function closeTab(tabId) {
+  const tabIndex = tabs.findIndex(t => t.id === tabId)
+  if (tabIndex === -1) return
+
+  // Don't allow closing the last tab
+  if (tabs.length === 1) {
+    showNotification('Cannot close the last tab', 'error')
+    return
+  }
+
+  const wasActive = tabId === activeTabId
+
+  // Remove the tab
+  tabs.splice(tabIndex, 1)
+
+  // If we closed the active tab, switch to another
+  if (wasActive) {
+    const newActiveIndex = Math.min(tabIndex, tabs.length - 1)
+    activeTabId = tabs[newActiveIndex].id
+    switchToTab(activeTabId)
   } else {
-    document.title = 'PlantUML Editor'
+    renderTabs()
   }
 }
+
+/**
+ * Get the active tab object
+ * @returns {Object|null} Active tab object or null
+ */
+function getActiveTab() {
+  return tabs.find(t => t.id === activeTabId) || null
+}
+
+/**
+ * Render the tab strip UI
+ */
+function renderTabs() {
+  const tabsContainer = document.getElementById('diagram-tabs')
+  if (!tabsContainer) return
+
+  if (tabs.length === 0) {
+    tabsContainer.innerHTML = ''
+    return
+  }
+
+  tabsContainer.innerHTML = tabs.map(tab => {
+    const isActive = tab.id === activeTabId
+    const activeClass = isActive ? 'tab-active' : 'tab-inactive'
+
+    return `
+      <div class="diagram-tab ${activeClass}" data-tab-id="${tab.id}">
+        <span class="tab-name">${escapeHtml(tab.name)}</span>
+        <button class="tab-close" onclick="closeTab('${tab.id}')" title="Close tab">×</button>
+      </div>
+    `
+  }).join('')
+}
+
+// Make closeTab globally accessible for onclick handlers
+window.closeTab = closeTab
+
+// Add click event delegation for tabs
+document.addEventListener('DOMContentLoaded', () => {
+  const tabsContainer = document.getElementById('diagram-tabs')
+  if (tabsContainer) {
+    tabsContainer.addEventListener('click', (e) => {
+      const tab = e.target.closest('.diagram-tab')
+      if (tab && !e.target.classList.contains('tab-close')) {
+        const tabId = tab.getAttribute('data-tab-id')
+        if (tabId) {
+          switchToTab(tabId)
+        }
+      }
+    })
+  }
+})
 
 async function loadFromUrl(url){
   window.location.hash = `#example=${url}`
@@ -460,21 +624,37 @@ async function handleShare() {
 }
 
 /**
- * Handle New button click - reset editor to default template
+ * Handle New button click - create a new diagram with name prompt
  */
 function handleNew() {
   const defaultTemplate = '@startuml\nBob -> Alice: Hello!\n@enduml';
 
-  // Always ask for confirmation
-  const confirmed = confirm('Create a new diagram? Any unsaved changes will be lost.');
+  // Prompt for diagram name
+  const diagramName = prompt('Enter a name for the new diagram:', 'Untitled Diagram')
 
-  if (confirmed) {
-    editor.setValue(defaultTemplate, -1);
-    editor.focus();
-    debouncedRender();
-    // Clear auto-save by resetting default file
-    saveDefaultFile(defaultTemplate);
+  // Cancel if user cancels or enters empty name
+  if (!diagramName || diagramName.trim() === '') {
+    return
   }
+
+  // Create a new file in localStorage
+  const newFile = saveFile(diagramName.trim(), defaultTemplate)
+
+  if (!newFile) {
+    showNotification('Failed to create new diagram', 'error')
+    return
+  }
+
+  // Create a new tab for this file
+  const tabId = createTab(newFile.id, newFile.name)
+
+  if (!tabId) {
+    return
+  }
+
+  // Switch to the new tab
+  switchToTab(tabId)
+  editor.focus()
 }
 
 // ============================================================================
@@ -539,6 +719,24 @@ function initializeDefaultFile() {
   editor.focus()
 }
 
+/**
+ * Initialize custom diagram tab system
+ */
+function initializeDiagramTabs() {
+  // Create initial tab with default content or restored state
+  const files = getAllFiles()
+  const defaultFile = files.find(f => f.id === 'default')
+
+  if (defaultFile) {
+    const tabId = createTab('default', 'Untitled')
+    if (tabId) {
+      activeTabId = tabId
+    }
+  }
+
+  renderTabs()
+}
+
 plantuml.initialize(jarPath).then(() => {
   // Try to restore editor state
   const restored = restoreEditorState()
@@ -568,6 +766,9 @@ plantuml.initialize(jarPath).then(() => {
 
   // Initialize copyright year
   initializeCopyrightYear()
+
+  // Initialize custom diagram tab system
+  initializeDiagramTabs()
 
   // Attach change listeners
   editor.session.on('change', function() {
@@ -763,21 +964,21 @@ function saveDefaultFile(content) {
  * Handle Save (Ctrl+S) - Save to current diagram without dialog
  */
 function handleSave() {
-  // If no current diagram in this tab, fallback to Save As
-  if (!currentDiagramName) {
+  const activeDiagramTab = getActiveTab()
+
+  // If no active tab or tab has no file, fallback to Save As
+  if (!activeDiagramTab) {
     openFilePanel('save')
     return
   }
 
   const files = getAllFiles()
-  const diagramIndex = files.findIndex(f => f.name === currentDiagramName)
+  const diagramIndex = files.findIndex(f => f.id === activeDiagramTab.fileId)
 
   // Validate diagram still exists
   if (diagramIndex === -1) {
-    showNotification(`Current diagram '${currentDiagramName}' no longer exists`, 'error')
-    currentDiagramName = null
-    localStorage.removeItem(STORAGE_KEYS.EDITOR_STATE)
-    updateWindowTitle(null)
+    showNotification(`Current diagram '${activeDiagramTab.name}' no longer exists`, 'error')
+    closeTab(activeDiagramTab.id)
     return
   }
 
@@ -792,20 +993,20 @@ function handleSave() {
 
     // Compare content with last saved content
     if (content !== lastSavedContent) {
-      showNotification(`Saved to '${currentDiagramName}'`, 'success')
+      showNotification(`Saved to '${activeDiagramTab.name}'`, 'success')
       lastSavedContent = content
     }
 
     // Save editor state for refresh recovery
     const editorState = {
-      diagramName: currentDiagramName,
+      diagramName: activeDiagramTab.name,
       content: content,
       timestamp: Date.now()
     }
     localStorage.setItem(STORAGE_KEYS.EDITOR_STATE, JSON.stringify(editorState))
 
-    // Update window title
-    updateWindowTitle(currentDiagramName)
+    // Update window title (keep it static)
+    updateWindowTitle(null)
   } catch (error) {
     console.error('Error saving diagram:', error)
     showNotification('Failed to save diagram', 'error')
@@ -1221,32 +1422,28 @@ function confirmOverwrite(diagramName) {
  * @param {string} fileId - ID of file to open
  */
 function handleOpenFile(fileId) {
-  const success = loadFileIntoEditor(fileId)
-  if (success) {
-    // Get the file object to retrieve its name
-    const files = getAllFiles()
-    const file = files.find(f => f.id === fileId)
+  const files = getAllFiles()
+  const file = files.find(f => f.id === fileId)
 
-    if (file) {
-      // Set as current diagram in this tab
-      currentDiagramName = file.name
-
-      // Save editor state
-      const editorState = {
-        diagramName: file.name,
-        content: file.content,
-        timestamp: Date.now()
-      }
-      localStorage.setItem(STORAGE_KEYS.EDITOR_STATE, JSON.stringify(editorState))
-
-      // Update tracking
-      lastSavedContent = file.content
-      updateWindowTitle(file.name)
-    }
-
-    closeModal()
-    debouncedRender()
+  if (!file) {
+    console.warn('File not found:', fileId)
+    return
   }
+
+  // Create a new tab for this file
+  const tabId = createTab(fileId, file.name)
+
+  if (!tabId) {
+    // Tab limit reached or other error
+    return
+  }
+
+  // Switch to the new tab
+  switchToTab(tabId)
+
+  // Close the modal
+  closeModal()
+  debouncedRender()
 }
 
 /**
@@ -1351,6 +1548,16 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.altKey && e.key === 'n') {
     e.preventDefault()
     handleNew()
+  }
+
+  // Ctrl+W - Close current tab
+  if (e.ctrlKey && !e.altKey && !e.shiftKey && e.key === 'w') {
+    e.preventDefault()
+    const activeDiagramTab = getActiveTab()
+    if (activeDiagramTab) {
+      closeTab(activeDiagramTab.id)
+    }
+    return
   }
 
   // Ctrl+Shift+U - Share URL (or Cmd+Shift+U on Mac)
