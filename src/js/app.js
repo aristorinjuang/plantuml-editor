@@ -85,7 +85,8 @@ function _renderBackend(uml) {
     const encoded = encode64(compressed);
 
     // Build URL and fetch image
-    const url = `https://www.plantuml.com/plantuml/png/${encoded}`;
+    const backendBaseUrl = import.meta.env.VITE_BACKEND_BASE_URL || 'https://www.plantuml.com/plantuml';
+    const url = `${backendBaseUrl}/png/${encoded}`;
     document.getElementById('render-image').src = url;
   } catch (error) {
     console.error('Back-end render error:', error);
