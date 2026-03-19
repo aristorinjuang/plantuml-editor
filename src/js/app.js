@@ -1240,14 +1240,14 @@ function renderFileList() {
         ${file.id !== 'default' ? `
           <button
             onclick="handleDeleteFile('${file.id}')"
-            class="px-3 py-1 bg-white hover:bg-gray-100 text-[#1A4F63] text-sm rounded transition-colors border border-gray-300"
+            class="px-3 py-1 bg-white hover:bg-gray-100 text-[#1A4F63] text-sm rounded transition-colors border border-gray-300 cursor-pointer"
           >
             Delete
           </button>
         ` : ''}
         <button
           onclick="handleOpenFile('${file.id}')"
-          class="px-3 py-1 bg-white hover:bg-gray-100 text-[#1A4F63] text-sm rounded transition-colors border border-gray-300"
+          class="px-3 py-1 bg-white hover:bg-gray-100 text-[#1A4F63] text-sm rounded transition-colors border border-gray-300 cursor-pointer"
         >
           ${file.id === 'default' ? 'Reload' : 'Open'}
         </button>
