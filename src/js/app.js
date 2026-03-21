@@ -85,7 +85,7 @@ function _renderBackend(uml) {
     const encoded = encode64(compressed);
 
     // Build URL and fetch image
-    const backendBaseUrl = import.meta.env.VITE_BACKEND_BASE_URL || 'https://www.plantuml.com/plantuml';
+    const backendBaseUrl = import.meta.env.VITE_PLANTUML_BASE_URL || 'https://www.plantuml.com/plantuml';
     const url = `${backendBaseUrl}/png/${encoded}`;
     document.getElementById('render-image').src = url;
   } catch (error) {
@@ -155,6 +155,145 @@ function initializeRenderer() {
     currentRenderer = 'frontend';
   }
   updateRendererIcon(currentRenderer);
+}
+
+// ============================================================================
+// AI PANEL STATE
+// ============================================================================
+
+let aiPanelExpanded = true;
+let generateAbortController = null;
+
+/**
+ * Initialize AI panel state from localStorage or default
+ */
+function initializeAIPanel() {
+  try {
+    const savedState = localStorage.getItem(STORAGE_KEYS.AI_PANEL_EXPANDED);
+    aiPanelExpanded = savedState !== 'false'; // Default to true
+  } catch (error) {
+    console.error('Error reading AI panel state:', error);
+    aiPanelExpanded = true;
+  }
+  updateAIPanelState();
+}
+
+/**
+ * Toggle AI panel expanded/collapsed state
+ */
+function toggleAIPanel() {
+  aiPanelExpanded = !aiPanelExpanded;
+  try {
+    localStorage.setItem(STORAGE_KEYS.AI_PANEL_EXPANDED, aiPanelExpanded.toString());
+  } catch (error) {
+    console.error('Error saving AI panel state:', error);
+  }
+  updateAIPanelState();
+}
+
+/**
+ * Update AI panel visual state based on current state
+ */
+function updateAIPanelState() {
+  const aiPanel = document.getElementById('ai-panel');
+  const chevron = document.getElementById('ai-panel-chevron');
+
+  if (!aiPanel || !chevron) return;
+
+  if (aiPanelExpanded) {
+    aiPanel.classList.remove('collapsed');
+    chevron.style.transform = 'rotate(0deg)';
+  } else {
+    aiPanel.classList.add('collapsed');
+    chevron.style.transform = 'rotate(-90deg)';
+  }
+}
+
+/**
+ * Generate PlantUML code using AI service
+ * @param {string} prompt - User's natural language prompt
+ * @param {AbortSignal} signal - AbortSignal for cancellation
+ * @returns {Promise<void>}
+ */
+async function generatePlantUML(prompt, signal) {
+  const backendBaseUrl = import.meta.env.VITE_BACKEND_BASE_URL || 'http://localhost:8081';
+
+  try {
+    const response = await fetch(`${backendBaseUrl}/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt }),
+      signal
+    });
+
+    if (!response.ok) {
+      // Handle HTTP errors
+      if (response.status === 400) {
+        const errorData = await response.json().catch(() => ({ message: 'Invalid request' }));
+        throw new Error(errorData.message || 'Invalid prompt. Please try again.');
+      } else if (response.status === 500) {
+        throw new Error('Server error. Please try again later.');
+      } else {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+    }
+
+    const data = await response.json();
+
+    if (data.status === 'success' && data.data && data.data.plantuml) {
+      // Success: update editor with generated PlantUML code
+      editor.setValue(data.data.plantuml, -1); // -1 moves cursor to start
+    } else {
+      throw new Error('Invalid response format from server');
+    }
+  } catch (error) {
+    // Handle errors
+    if (error.name === 'AbortError') {
+      // User cancelled the request - don't show error
+      console.log('Generation request cancelled by user');
+      throw error; // Re-throw to let caller handle cancellation
+    } else if (error.message) {
+      throw error; // Re-throw to let caller display notification
+    } else {
+      throw new Error('Network error. Please check your connection and try again.');
+    }
+  }
+}
+
+/**
+ * Show loading modal and store abort controller
+ * @param {AbortController} controller - AbortController for cancelling the request
+ */
+function showGenerateLoadingModal(controller) {
+  generateAbortController = controller;
+  const modal = document.getElementById('generate-loading-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+  }
+}
+
+/**
+ * Close loading modal and cleanup abort controller
+ */
+function closeGenerateLoadingModal() {
+  const modal = document.getElementById('generate-loading-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+  generateAbortController = null;
+}
+
+/**
+ * Cancel the generation request
+ */
+function cancelGeneration() {
+  if (generateAbortController) {
+    generateAbortController.abort();
+    generateAbortController = null;
+  }
+  closeGenerateLoadingModal();
 }
 
 /**
@@ -765,6 +904,9 @@ plantuml.initialize(jarPath).then(() => {
   // Initialize renderer
   initializeRenderer()
 
+  // Initialize AI panel
+  initializeAIPanel()
+
   // Initialize copyright year
   initializeCopyrightYear()
 
@@ -893,7 +1035,8 @@ const STORAGE_KEYS = {
   DEFAULT: 'plantuml-default',
   RENDERER: 'plantuml-renderer',
   THEME: 'plantuml-theme',
-  EDITOR_STATE: 'plantuml_editor_state'
+  EDITOR_STATE: 'plantuml_editor_state',
+  AI_PANEL_EXPANDED: 'plantuml-ai-panel-expanded'
 }
 
 /**
@@ -1486,6 +1629,64 @@ document.getElementById('btn-theme').addEventListener('click', () => {
 // Renderer toggle event listener
 document.getElementById('btn-renderer').addEventListener('click', toggleRenderer)
 
+// AI Panel toggle event listener
+document.getElementById('ai-panel-toggle').addEventListener('click', toggleAIPanel)
+
+// Generate loading modal event listeners
+document.getElementById('close-generate-modal').addEventListener('click', cancelGeneration)
+document.getElementById('close-generate-modal-x').addEventListener('click', cancelGeneration)
+document.getElementById('cancel-generate').addEventListener('click', cancelGeneration)
+
+// Click outside to dismiss generate loading modal (cancels request)
+document.getElementById('generate-loading-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'generate-loading-modal') {
+    cancelGeneration()
+  }
+})
+
+// AI Prompt textarea - enable/disable generate button based on content
+const aiPromptTextarea = document.getElementById('ai-prompt-textarea')
+const generateButton = document.getElementById('btn-generate')
+
+if (aiPromptTextarea && generateButton) {
+  aiPromptTextarea.addEventListener('input', () => {
+    const hasContent = aiPromptTextarea.value.trim().length > 0
+    generateButton.disabled = !hasContent
+  })
+
+  // Generate button click handler
+  generateButton.addEventListener('click', async () => {
+    const prompt = aiPromptTextarea.value.trim()
+
+    if (!prompt) {
+      showNotification('Please enter a description for your diagram', 'error')
+      return
+    }
+
+    // Create AbortController for this request
+    const controller = new AbortController()
+
+    // Disable button and show loading modal
+    generateButton.disabled = true
+    showGenerateLoadingModal(controller)
+
+    try {
+      await generatePlantUML(prompt, controller.signal)
+      // Success: editor was updated by generatePlantUML
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        // Show error notification for non-cancel errors
+        showNotification(error.message || 'Failed to generate diagram', 'error')
+      }
+      // If AbortError, user cancelled - no notification needed
+    } finally {
+      // Re-enable button and close modal
+      generateButton.disabled = aiPromptTextarea.value.trim().length === 0
+      closeGenerateLoadingModal()
+    }
+  })
+}
+
 // Share button event listener
 document.getElementById('btn-share').addEventListener('click', handleShare)
 
@@ -1571,8 +1772,10 @@ document.addEventListener('keydown', (e) => {
   // Escape - Close modals (independent check for each modal)
   if (e.key === 'Escape') {
     const shareModal = document.getElementById('share-modal')
+    const generateModal = document.getElementById('generate-loading-modal')
     const fileModalOpen = !fileModal.classList.contains('hidden')
     const shareModalOpen = !shareModal.classList.contains('hidden')
+    const generateModalOpen = generateModal && !generateModal.classList.contains('hidden')
 
     if (fileModalOpen) {
       e.preventDefault()
@@ -1584,6 +1787,12 @@ document.addEventListener('keydown', (e) => {
       e.preventDefault()
       e.stopPropagation()
       closeShareModal()
+    }
+
+    if (generateModalOpen) {
+      e.preventDefault()
+      e.stopPropagation()
+      cancelGeneration()
     }
   }
 
@@ -1599,5 +1808,14 @@ document.addEventListener('keydown', (e) => {
   if (e.altKey && (e.key === 'r' || e.key === 'R')) {
     e.preventDefault()
     toggleRenderer()
+  }
+
+  // Ctrl+G - Focus AI prompt textarea
+  if (e.ctrlKey && !e.altKey && !e.shiftKey && (e.key === 'g' || e.key === 'G')) {
+    e.preventDefault()
+    const aiTextarea = document.getElementById('ai-prompt-textarea')
+    if (aiTextarea) {
+      aiTextarea.focus()
+    }
   }
 })
