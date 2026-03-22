@@ -1,3 +1,6 @@
+// Firebase Auth imports - need to import in app.js since modules are scoped
+import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
 // load parameters
 const pathname = window.location.pathname.match(/^.*[\/]/)[0] // until the trailing slash, do not include the filename
 
@@ -27,9 +30,6 @@ let currentRenderer = 'frontend' // 'frontend' or 'backend'
 
 // Track last saved content for change detection
 let lastSavedContent = ''
-
-// Track current diagram name for this tab (not shared across tabs)
-let currentDiagramName = null
 
 // Custom tab system for managing multiple diagrams
 const MAX_TABS = 15
@@ -166,6 +166,70 @@ function isBackendConfigured() {
   return Boolean(backendUrl && backendUrl.trim() !== '');
 }
 
+/**
+ * Check if user is authenticated with Firebase
+ * @returns {boolean} True if user is logged in
+ */
+function isAuthenticated() {
+  return Boolean(window.auth && window.auth.currentUser);
+}
+
+/**
+ * Handle Google sign-in with popup
+ * @returns {Promise<void>}
+ */
+async function handleLogin() {
+  console.log('handleLogin called, auth available:', !!window.auth);
+
+  if (!window.auth) {
+    showNotification('Firebase not initialized. Please refresh the page.', 'error');
+    console.error('Firebase auth not available');
+    return;
+  }
+
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.addScope('email');
+    provider.addScope('profile');
+
+    console.log('Starting Google sign-in flow...');
+    await signInWithPopup(window.auth, provider);
+    console.log('Sign-in successful');
+    showNotification('Successfully signed in!', 'success');
+  } catch (error) {
+    console.error('Login error - code:', error.code, 'message:', error.message, 'full error:', error);
+
+    // Provide specific error messages based on error code
+    if (error.code === 'auth/popup-blocked') {
+      showNotification('Please enable popups to sign in with Google', 'error');
+    } else if (error.code === 'auth/popup-closed-by-user') {
+      showNotification('Sign-in was cancelled', 'error');
+    } else if (error.code === 'auth/unauthorized-domain') {
+      showNotification('This domain is not authorized for sign-in. Please contact the administrator.', 'error');
+    } else if (error.code === 'auth/quota-exceeded') {
+      showNotification('Too many sign-in attempts. Please try again later.', 'error');
+    } else if (error.code === 'auth/configuration-not-found') {
+      showNotification('Firebase configuration error. Please contact the administrator.', 'error');
+    } else {
+      showNotification(`Failed to sign in: ${error.message || 'Unknown error'}`, 'error');
+    }
+  }
+}
+
+/**
+ * Handle sign-out
+ * @returns {Promise<void>}
+ */
+async function handleLogout() {
+  try {
+    await signOut(window.auth);
+    showNotification('Signed out successfully', 'success');
+  } catch (error) {
+    console.error('Logout error:', error);
+    showNotification('Failed to sign out. Please try again.', 'error');
+  }
+}
+
 // ============================================================================
 // AI PANEL STATE
 // ============================================================================
@@ -197,6 +261,16 @@ function initializeAIPanel() {
     aiPanelExpanded = true;
   }
   updateAIPanelState();
+
+  // Set up authentication state listener and update initial UI state
+  if (window.auth) {
+    onAuthStateChanged(window.auth, () => {
+      updateAuthUI();
+    });
+
+    // Update UI immediately to set initial state
+    updateAuthUI();
+  }
 }
 
 /**
@@ -231,29 +305,106 @@ function updateAIPanelState() {
 }
 
 /**
+ * Update authentication UI state based on current auth state
+ */
+function updateAuthUI() {
+  const authRequired = document.getElementById('ai-auth-required');
+  const authenticated = document.getElementById('ai-authenticated');
+  const userInfo = document.getElementById('user-info');
+  const logoutBtn = document.getElementById('btn-logout');
+
+  // Defensive check - ensure all elements exist
+  if (!authRequired || !authenticated || !userInfo || !logoutBtn) {
+    return;
+  }
+
+  try {
+    if (isAuthenticated()) {
+      // User is logged in
+      authRequired.classList.add('hidden');
+      authenticated.classList.remove('hidden');
+
+      // Show user info
+      const user = window.auth.currentUser;
+      const displayName = user.displayName || user.email || 'User';
+      userInfo.textContent = displayName;
+      userInfo.classList.remove('hidden');
+      logoutBtn.classList.remove('hidden');
+
+      // Enable generate button if textarea has content
+      const generateBtn = document.getElementById('btn-generate');
+      const aiPromptTextarea = document.getElementById('ai-prompt-textarea');
+      if (generateBtn && aiPromptTextarea) {
+        const hasContent = aiPromptTextarea.value.trim().length > 0;
+        generateBtn.disabled = !hasContent;
+      }
+    } else {
+      // User is not logged in
+      authRequired.classList.remove('hidden');
+      authenticated.classList.add('hidden');
+      userInfo.classList.add('hidden');
+      logoutBtn.classList.add('hidden');
+
+      // Disable generate button
+      const generateBtn = document.getElementById('btn-generate');
+      if (generateBtn) {
+        generateBtn.disabled = true;
+      }
+    }
+  } catch (error) {
+    console.error('Error updating auth UI:', error);
+  }
+}
+
+/**
  * Generate PlantUML code using AI service
+ * Requires user to be authenticated with Firebase
  * @param {string} prompt - User's natural language prompt
  * @param {AbortSignal} signal - AbortSignal for cancellation
  * @returns {Promise<void>}
  */
 async function generatePlantUML(prompt, signal) {
+  // Check if user is authenticated
+  if (!isAuthenticated()) {
+    throw new Error('Please sign in to use AI generation');
+  }
+
   const backendBaseUrl = import.meta.env.VITE_BACKEND_BASE_URL || 'http://localhost:8081';
 
   try {
-    const response = await fetch(`${backendBaseUrl}/generate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ prompt }),
-      signal
-    });
+    // Get Firebase ID token
+    const makeRequest = async (forceRefresh = false) => {
+      const currentToken = await window.auth.currentUser.getIdToken(forceRefresh);
+      return await fetch(`${backendBaseUrl}/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentToken}`
+        },
+        body: JSON.stringify({ prompt }),
+        signal
+      });
+    };
+
+    let response = await makeRequest();
+
+    // Handle 401 Unauthorized - try to refresh token and retry once
+    if (response.status === 401) {
+      console.log('Token expired, attempting refresh...');
+      try {
+        response = await makeRequest(true); // Force refresh token
+      } catch (retryError) {
+        throw new Error('Authentication failed. Please sign in again.');
+      }
+    }
 
     if (!response.ok) {
       // Handle HTTP errors
       if (response.status === 400) {
         const errorData = await response.json().catch(() => ({ message: 'Invalid request' }));
         throw new Error(errorData.message || 'Invalid prompt. Please try again.');
+      } else if (response.status === 401) {
+        throw new Error('Authentication failed. Please sign in again.');
       } else if (response.status === 500) {
         throw new Error('Server error. Please try again later.');
       } else {
@@ -576,17 +727,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 })
 
-async function loadFromUrl(url){
-  window.location.hash = `#example=${url}`
-
-  const response = await fetch(url)
-  const pumlContent = await response.text()
-
-  editor.setValue(pumlContent, -1)
-  editor.focus()
-}
-
-const debouncedLoadFromUrl = debounce((url) => loadFromUrl(url))
 const jarPath = "/app" + pathname + "jar"
 
 // ============================================================================
@@ -1252,35 +1392,6 @@ function deleteFile(fileId) {
 }
 
 /**
- * Load file content into the editor (copies to default)
- * @param {string} fileId - ID of file to load
- * @returns {boolean} True if loaded, false otherwise
- */
-function loadFileIntoEditor(fileId) {
-  try {
-    const files = getAllFiles()
-    const file = files.find(f => f.id === fileId)
-
-    if (!file) {
-      console.warn('File not found:', fileId)
-      return false
-    }
-
-    // Load content into editor
-    editor.setValue(file.content, -1)
-    editor.focus()
-
-    // Update default file with loaded content
-    saveDefaultFile(file.content)
-
-    return true
-  } catch (error) {
-    console.error('Error loading file into editor:', error)
-    return false
-  }
-}
-
-/**
  * Validate file name
  * @param {string} name - File name to validate
  * @param {Array} files - Existing files array
@@ -1327,8 +1438,6 @@ function formatDate(isoString) {
 // ============================================================================
 // FILE PANEL MODAL
 // ============================================================================
-
-let currentMode = 'open' // 'save' or 'open'
 
 const fileModal = document.getElementById('file-modal')
 const modalTitle = document.getElementById('modal-title')
@@ -1683,14 +1792,15 @@ if (isBackendConfigured()) {
     });
   }
 
-  // AI Prompt textarea - enable/disable generate button based on content
+  // AI Prompt textarea - enable/disable generate button based on content and auth
   const aiPromptTextarea = document.getElementById('ai-prompt-textarea');
   const generateButton = document.getElementById('btn-generate');
 
   if (aiPromptTextarea && generateButton) {
     aiPromptTextarea.addEventListener('input', () => {
       const hasContent = aiPromptTextarea.value.trim().length > 0;
-      generateButton.disabled = !hasContent;
+      const isAuthenticated = window.auth && window.auth.currentUser;
+      generateButton.disabled = !hasContent || !isAuthenticated;
     });
 
     // Generate button click handler
@@ -1724,6 +1834,18 @@ if (isBackendConfigured()) {
         closeGenerateLoadingModal();
       }
     });
+  }
+
+  // Authentication button event listeners
+  const loginButton = document.getElementById('btn-login');
+  const logoutButton = document.getElementById('btn-logout');
+
+  if (loginButton) {
+    loginButton.addEventListener('click', handleLogin);
+  }
+
+  if (logoutButton) {
+    logoutButton.addEventListener('click', handleLogout);
   }
 }
 

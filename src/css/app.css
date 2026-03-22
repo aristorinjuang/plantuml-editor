@@ -444,6 +444,75 @@ main {
 }
 
 /* ============================================================================
+   AUTHENTICATION UI ELEMENTS
+   ============================================================================ */
+
+/* Login button */
+#btn-login {
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+#btn-login:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+#btn-login:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Logout button */
+#btn-logout {
+  transition: background-color 0.2s ease;
+}
+
+/* User info display */
+#user-info {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Auth state visibility */
+#ai-auth-required.hidden,
+#ai-authenticated.hidden {
+  display: none;
+}
+
+#ai-auth-required:not(.hidden),
+#ai-authenticated:not(.hidden) {
+  display: block;
+}
+
+/* Smooth transition for auth state changes */
+#ai-auth-required,
+#ai-authenticated {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Mobile responsiveness for auth buttons */
+@media (max-width: 810px) {
+  #btn-login {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  #btn-logout {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  #user-info {
+    max-width: 100px;
+    font-size: 10px;
+  }
+}
+
+/* ============================================================================
    AI GENERATION LOADING MODAL
    ============================================================================ */
 
