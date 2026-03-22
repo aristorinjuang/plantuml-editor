@@ -157,6 +157,15 @@ function initializeRenderer() {
   updateRendererIcon(currentRenderer);
 }
 
+/**
+ * Check if the AI backend is properly configured
+ * @returns {boolean} True if VITE_BACKEND_BASE_URL is configured and non-empty
+ */
+function isBackendConfigured() {
+  const backendUrl = import.meta.env.VITE_BACKEND_BASE_URL;
+  return Boolean(backendUrl && backendUrl.trim() !== '');
+}
+
 // ============================================================================
 // AI PANEL STATE
 // ============================================================================
@@ -168,6 +177,18 @@ let generateAbortController = null;
  * Initialize AI panel state from localStorage or default
  */
 function initializeAIPanel() {
+  // Check if backend is configured
+  if (!isBackendConfigured()) {
+    // Hide the AI panel completely if backend is not configured
+    const aiPanel = document.getElementById('ai-panel');
+    if (aiPanel) {
+      aiPanel.classList.add('hidden');
+    }
+    // Don't initialize state or attach event listeners
+    return;
+  }
+
+  // Backend is configured, proceed with normal initialization
   try {
     const savedState = localStorage.getItem(STORAGE_KEYS.AI_PANEL_EXPANDED);
     aiPanelExpanded = savedState !== 'false'; // Default to true
@@ -1629,62 +1650,81 @@ document.getElementById('btn-theme').addEventListener('click', () => {
 // Renderer toggle event listener
 document.getElementById('btn-renderer').addEventListener('click', toggleRenderer)
 
-// AI Panel toggle event listener
-document.getElementById('ai-panel-toggle').addEventListener('click', toggleAIPanel)
-
-// Generate loading modal event listeners
-document.getElementById('close-generate-modal').addEventListener('click', cancelGeneration)
-document.getElementById('close-generate-modal-x').addEventListener('click', cancelGeneration)
-document.getElementById('cancel-generate').addEventListener('click', cancelGeneration)
-
-// Click outside to dismiss generate loading modal (cancels request)
-document.getElementById('generate-loading-modal').addEventListener('click', (e) => {
-  if (e.target.id === 'generate-loading-modal') {
-    cancelGeneration()
+// AI Panel event listeners (only if backend is configured)
+if (isBackendConfigured()) {
+  // AI Panel toggle event listener
+  const aiPanelToggle = document.getElementById('ai-panel-toggle');
+  if (aiPanelToggle) {
+    aiPanelToggle.addEventListener('click', toggleAIPanel);
   }
-})
 
-// AI Prompt textarea - enable/disable generate button based on content
-const aiPromptTextarea = document.getElementById('ai-prompt-textarea')
-const generateButton = document.getElementById('btn-generate')
+  // Generate loading modal event listeners
+  const closeGenerateModal = document.getElementById('close-generate-modal');
+  const closeGenerateModalX = document.getElementById('close-generate-modal-x');
+  const cancelGenerateButton = document.getElementById('cancel-generate');
 
-if (aiPromptTextarea && generateButton) {
-  aiPromptTextarea.addEventListener('input', () => {
-    const hasContent = aiPromptTextarea.value.trim().length > 0
-    generateButton.disabled = !hasContent
-  })
+  if (closeGenerateModal) {
+    closeGenerateModal.addEventListener('click', cancelGeneration);
+  }
+  if (closeGenerateModalX) {
+    closeGenerateModalX.addEventListener('click', cancelGeneration);
+  }
+  if (cancelGenerateButton) {
+    cancelGenerateButton.addEventListener('click', cancelGeneration);
+  }
 
-  // Generate button click handler
-  generateButton.addEventListener('click', async () => {
-    const prompt = aiPromptTextarea.value.trim()
-
-    if (!prompt) {
-      showNotification('Please enter a description for your diagram', 'error')
-      return
-    }
-
-    // Create AbortController for this request
-    const controller = new AbortController()
-
-    // Disable button and show loading modal
-    generateButton.disabled = true
-    showGenerateLoadingModal(controller)
-
-    try {
-      await generatePlantUML(prompt, controller.signal)
-      // Success: editor was updated by generatePlantUML
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        // Show error notification for non-cancel errors
-        showNotification(error.message || 'Failed to generate diagram', 'error')
+  // Click outside to dismiss generate loading modal (cancels request)
+  const generateLoadingModal = document.getElementById('generate-loading-modal');
+  if (generateLoadingModal) {
+    generateLoadingModal.addEventListener('click', (e) => {
+      if (e.target.id === 'generate-loading-modal') {
+        cancelGeneration();
       }
-      // If AbortError, user cancelled - no notification needed
-    } finally {
-      // Re-enable button and close modal
-      generateButton.disabled = aiPromptTextarea.value.trim().length === 0
-      closeGenerateLoadingModal()
-    }
-  })
+    });
+  }
+
+  // AI Prompt textarea - enable/disable generate button based on content
+  const aiPromptTextarea = document.getElementById('ai-prompt-textarea');
+  const generateButton = document.getElementById('btn-generate');
+
+  if (aiPromptTextarea && generateButton) {
+    aiPromptTextarea.addEventListener('input', () => {
+      const hasContent = aiPromptTextarea.value.trim().length > 0;
+      generateButton.disabled = !hasContent;
+    });
+
+    // Generate button click handler
+    generateButton.addEventListener('click', async () => {
+      const prompt = aiPromptTextarea.value.trim();
+
+      if (!prompt) {
+        showNotification('Please enter a description for your diagram', 'error');
+        return;
+      }
+
+      // Create AbortController for this request
+      const controller = new AbortController();
+
+      // Disable button and show loading modal
+      generateButton.disabled = true;
+      showGenerateLoadingModal(controller);
+
+      try {
+        await generatePlantUML(prompt, controller.signal);
+        // Success: editor was updated by generatePlantUML
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          // Show error notification for non-cancel errors
+          showNotification(error.message || 'Failed to generate diagram', 'error');
+        }
+        // If AbortError, user cancelled - no notification needed
+      } finally {
+        // Re-enable button and close modal
+        generateButton.disabled = aiPromptTextarea.value.trim().length === 0;
+        closeGenerateLoadingModal();
+      }
+    });
+  }
 }
 
 // Share button event listener
