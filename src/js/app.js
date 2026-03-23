@@ -1445,13 +1445,11 @@ const saveInputContainer = document.getElementById('save-input-container')
 const fileNameInput = document.getElementById('file-name-input')
 const nameError = document.getElementById('name-error')
 const fileListContainer = document.getElementById('file-list')
-
 /**
  * Open file panel modal in specified mode
  * @param {string} mode - 'save' or 'open'
  */
 function openFilePanel(mode) {
-  currentMode = mode
 
   // Show modal
   fileModal.classList.remove('hidden')
@@ -1485,7 +1483,6 @@ function openFilePanel(mode) {
  */
 function closeModal() {
   fileModal.classList.add('hidden')
-  currentMode = 'open'
   nameError.classList.add('hidden')
   fileNameInput.value = ''
 }
