@@ -10,6 +10,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
+        privacy: 'privacy-policy.html',
         app: path.resolve(__dirname, 'src/js/app.js'),
         appCss: path.resolve(__dirname, 'src/css/app.css'),
       },
